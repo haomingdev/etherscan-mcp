@@ -23,13 +23,16 @@ import {
   EtherscanMinedBlock,
   EtherscanGetSourceCodeResponse,
   EtherscanGetAbiResponse,
-  EtherscanTokenSupplyResponse, // Added
-  EtherscanTokenInfoResponse, // Added
-  EtherscanTokenInfo, // Added
+  EtherscanTokenSupplyResponse,
+  EtherscanTokenInfoResponse,
+  EtherscanTokenInfo,
+  TxReceiptStatusResponse, // Added for Transaction module
+  TxExecutionStatusResponse, // Added for Transaction module
 } from "./utils/types.js";
 import { accountToolDefinitions, McpToolDefinition } from "./tools/account.js";
 import { contractToolDefinitions } from "./tools/contract.js";
-import { tokenToolDefinitions } from "./tools/token.js"; // Added import for token tools
+import { tokenToolDefinitions } from "./tools/token.js";
+import { transactionToolDefinitions } from "./tools/transaction.js"; // Added import for transaction tools
 import { EtherscanBalanceResponse } from "./utils/types.js"; // Import response types for handling
 import { zodToJsonSchema } from "zod-to-json-schema"; // Import the conversion function
 
@@ -37,7 +40,8 @@ import { zodToJsonSchema } from "zod-to-json-schema"; // Import the conversion f
 const allToolDefinitions = [
   ...accountToolDefinitions,
   ...contractToolDefinitions,
-  ...tokenToolDefinitions, // Added token tools
+  ...tokenToolDefinitions,
+  ...transactionToolDefinitions, // Added transaction tools
 ];
 
 // Load environment variables from .env file
@@ -193,8 +197,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       | EtherscanMinedBlocksResponse
       | EtherscanGetSourceCodeResponse
       | EtherscanGetAbiResponse
-      | EtherscanTokenSupplyResponse // Added
-      | EtherscanTokenInfoResponse; // Added
+      | EtherscanTokenSupplyResponse
+      | EtherscanTokenInfoResponse
+      | TxReceiptStatusResponse // Added
+      | TxExecutionStatusResponse; // Added
     let resultText: string;
 
     switch (toolName) {
@@ -545,6 +551,71 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           console.error(
             `[Server:callTool][${toolName}] API Error/No Data Response:`,
             tokenInfoResponse
+          );
+        }
+        break;
+      // --- End Added Cases ---
+
+      // --- Added Cases for Phase 5 ---
+      case "etherscan_getTransactionReceiptStatus":
+        const receiptStatusResponse: TxReceiptStatusResponse =
+          await etherscanClient.getTransactionReceiptStatus(validatedArgs);
+        // --- DEBUG LOGGING ---
+        console.error(
+          `[Server:callTool][${toolName}] Raw Response:`,
+          JSON.stringify(receiptStatusResponse, null, 2)
+        );
+        // --- END DEBUG LOGGING ---
+        console.error(
+          `[Server:callTool][${toolName}] Etherscan API Status: ${receiptStatusResponse.status}, Message: ${receiptStatusResponse.message}`
+        );
+        if (receiptStatusResponse.status === "1") {
+          // Access nested status carefully
+          const status = receiptStatusResponse.result?.status; // Use optional chaining just in case result is null/undefined
+          console.error(
+            `[Server:callTool][${toolName}] Nested Status Value:`,
+            status
+          ); // Log the extracted status
+          resultText = `Transaction Receipt Status for ${
+            validatedArgs.txhash
+          }: ${
+            status === "1" ? "Success" : "Failed/Error"
+          } (Status Code: ${status})`;
+        } else {
+          resultText = `Etherscan API Error (${toolName}): ${
+            receiptStatusResponse.message || "Unknown API error"
+          } (Result: ${JSON.stringify(receiptStatusResponse.result)})`;
+          console.error(
+            `[Server:callTool][${toolName}] API Error Response:`,
+            receiptStatusResponse
+          );
+        }
+        break;
+
+      case "etherscan_getTransactionStatus":
+        const execStatusResponse: TxExecutionStatusResponse =
+          await etherscanClient.getTransactionStatus(validatedArgs);
+        console.error(
+          `[Server:callTool][${toolName}] Etherscan API Status: ${execStatusResponse.status}, Message: ${execStatusResponse.message}`
+        );
+        // Note: The 'status' field in the base response might indicate API call success/failure,
+        // while 'result.isError' indicates the *transaction's* execution status.
+        if (execStatusResponse.status === "1") {
+          const isError = execStatusResponse.result.isError;
+          const errDesc = execStatusResponse.result.errDescription;
+          resultText = `Transaction Execution Status for ${
+            validatedArgs.txhash
+          }: ${isError === "0" ? "Success" : "Error"}${
+            isError === "1" ? ` (Description: ${errDesc})` : ""
+          }`;
+        } else {
+          // This case handles errors in the API call itself (e.g., invalid txhash format reported by Etherscan API)
+          resultText = `Etherscan API Error (${toolName}): ${
+            execStatusResponse.message || "Unknown API error"
+          } (Result: ${JSON.stringify(execStatusResponse.result)})`;
+          console.error(
+            `[Server:callTool][${toolName}] API Error Response:`,
+            execStatusResponse
           );
         }
         break;

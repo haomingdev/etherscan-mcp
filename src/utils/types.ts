@@ -217,4 +217,29 @@ export interface EtherscanTokenInfoResponse extends EtherscanBaseResponse {
   result: EtherscanTokenInfo[];
 }
 
+// --- Transaction Module Types ---
+
+/**
+ * Response for 'transaction' module, 'gettxreceiptstatus' action.
+ * Based on https://docs.etherscan.io/api-endpoints/stats-1#get-transaction-receipt-status
+ * Note: Etherscan docs place this under Transactions, not Stats as the URL might imply.
+ */
+export interface TxReceiptStatusResponse extends EtherscanBaseResponse {
+  result: {
+    status: "0" | "1"; // "1" for success, "0" for failure/error
+  };
+}
+
+/**
+ * Response for 'transaction' module, 'getstatus' action (execution status).
+ * Based on https://docs.etherscan.io/api-endpoints/stats-1#check-transaction-receipt-status
+ * Note: Etherscan docs place this under Transactions, not Stats as the URL might imply.
+ */
+export interface TxExecutionStatusResponse extends EtherscanBaseResponse {
+  result: {
+    isError: "0" | "1"; // "0" for no error, "1" for error
+    errDescription: string; // Description if isError is "1"
+  };
+}
+
 // We will add more specific response types here later for other modules (Logs, etc.)

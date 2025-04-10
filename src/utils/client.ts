@@ -8,8 +8,10 @@ import {
   EtherscanMinedBlocksResponse,
   EtherscanGetSourceCodeResponse,
   EtherscanGetAbiResponse,
-  EtherscanTokenSupplyResponse, // Added
-  EtherscanTokenInfoResponse, // Added
+  EtherscanTokenSupplyResponse,
+  EtherscanTokenInfoResponse,
+  TxReceiptStatusResponse, // Added for Transaction module
+  TxExecutionStatusResponse, // Added for Transaction module
 } from "./types.js";
 
 // Optional: Define a custom error class
@@ -50,6 +52,7 @@ export class EtherscanClient {
     42161: "https://api.arbiscan.io/api", // Arbitrum One
     137: "https://api.polygonscan.com/api", // Polygon PoS
     56: "https://api.bscscan.com/api", // BSC Mainnet
+    80094: "https://api.berachain.com/api", // Berachain Mainnet
   };
 
   constructor(apiKey: string) {
@@ -436,6 +439,46 @@ export class EtherscanClient {
       module: "token",
       action: "tokeninfo",
       contractaddress: params.contractaddress,
+    });
+  }
+
+  // --- Transaction Module Methods ---
+
+  /**
+   * Get Transaction Receipt Status.
+   * Module: transaction, Action: gettxreceiptstatus
+   * Note: Only applicable for post-Byzantium fork transactions. Status '1' = Success, '0' = Failed.
+   */
+  async getTransactionReceiptStatus(params: {
+    txhash: string;
+    chainId: number;
+  }): Promise<TxReceiptStatusResponse> {
+    console.error(
+      `[EtherscanClient:getTransactionReceiptStatus] Fetching receipt status for tx ${params.txhash} on chain ${params.chainId}`
+    );
+    return this._request<TxReceiptStatusResponse>(params.chainId, {
+      module: "transaction",
+      action: "gettxreceiptstatus",
+      txhash: params.txhash,
+    });
+  }
+
+  /**
+   * Check Transaction Execution Status.
+   * Module: transaction, Action: getstatus
+   * Note: Status '0' = Pass, '1' = Error. Provides errDescription if error.
+   */
+  async getTransactionStatus(params: {
+    txhash: string;
+    chainId: number;
+  }): Promise<TxExecutionStatusResponse> {
+    console.error(
+      `[EtherscanClient:getTransactionStatus] Fetching execution status for tx ${params.txhash} on chain ${params.chainId}`
+    );
+    return this._request<TxExecutionStatusResponse>(params.chainId, {
+      module: "transaction",
+      action: "getstatus", // Correct action for execution status
+      txhash: params.txhash,
     });
   }
 
