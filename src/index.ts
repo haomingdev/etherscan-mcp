@@ -15,10 +15,30 @@ import {
 import {
   EtherscanTxListResponse,
   EtherscanNormalTransaction,
+  EtherscanInternalTxListResponse, // Added
+  EtherscanInternalTransaction, // Added
+  EtherscanTokenTxResponse, // Added
+  EtherscanTokenTransfer, // Added
+  EtherscanMinedBlocksResponse,
+  EtherscanMinedBlock,
+  EtherscanGetSourceCodeResponse,
+  EtherscanGetAbiResponse,
+  EtherscanTokenSupplyResponse, // Added
+  EtherscanTokenInfoResponse, // Added
+  EtherscanTokenInfo, // Added
 } from "./utils/types.js";
-import { accountToolDefinitions, McpToolDefinition } from "./tools/account.js"; // Import definitions and type
+import { accountToolDefinitions, McpToolDefinition } from "./tools/account.js";
+import { contractToolDefinitions } from "./tools/contract.js";
+import { tokenToolDefinitions } from "./tools/token.js"; // Added import for token tools
 import { EtherscanBalanceResponse } from "./utils/types.js"; // Import response types for handling
 import { zodToJsonSchema } from "zod-to-json-schema"; // Import the conversion function
+
+// Combine all tool definitions
+const allToolDefinitions = [
+  ...accountToolDefinitions,
+  ...contractToolDefinitions,
+  ...tokenToolDefinitions, // Added token tools
+];
 
 // Load environment variables from .env file
 dotenv.config();
@@ -68,12 +88,13 @@ console.error("[Setup] Server initialized. Setting up request handlers..."); // 
  */
 server.setRequestHandler(ListToolsRequestSchema, async () => {
   console.error(
-    "[Server:listTools] Received request. Serving defined account tools."
-  ); // Changed to stderr for now
+    "[Server:listTools] Received request. Serving all defined tools." // Updated log message
+  );
 
   // Convert Zod schemas to JSON Schemas before returning
-  const toolsWithJsonSchema = accountToolDefinitions.map(
+  const toolsWithJsonSchema = allToolDefinitions.map(
     (tool: McpToolDefinition) => {
+      // Use combined array
       try {
         // Pass options to inline definitions instead of using $ref
         const jsonSchema = zodToJsonSchema(tool.inputSchema, {
@@ -95,10 +116,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           `[Server:listTools] Error converting schema for ${tool.name}:`,
           error.message
         );
-        console.error(
-          "[Server:listTools] Zod Schema:",
-          JSON.stringify(tool.inputSchema.shape, null, 2)
-        ); // Log the input schema shape
+        // Removed the line causing the error: console.error("[Server:listTools] Zod Schema:", JSON.stringify(tool.inputSchema.shape, null, 2));
         // Return a placeholder or rethrow, depending on desired behavior.
         // For now, let's return a minimal structure to potentially avoid crashing the map.
         return {
@@ -131,10 +149,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
  */
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const toolName = request.params.name;
-  console.error(`[Server:callTool] Received request for tool: ${toolName}`); // Changed to stderr for now
+  console.error(`[Server:callTool] Received request for tool: ${toolName}`);
 
-  // 1. Find the tool definition
-  const tool: McpToolDefinition | undefined = accountToolDefinitions.find(
+  // 1. Find the tool definition from the combined list
+  const tool: McpToolDefinition | undefined = allToolDefinitions.find(
     (t: McpToolDefinition) => t.name === toolName
   );
   if (!tool) {
@@ -169,7 +187,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     let responseData:
       | EtherscanBalanceResponse
       | EtherscanTxListResponse
-      | MultiBalanceApiResponse;
+      | MultiBalanceApiResponse
+      | EtherscanInternalTxListResponse
+      | EtherscanTokenTxResponse
+      | EtherscanMinedBlocksResponse
+      | EtherscanGetSourceCodeResponse
+      | EtherscanGetAbiResponse
+      | EtherscanTokenSupplyResponse // Added
+      | EtherscanTokenInfoResponse; // Added
     let resultText: string;
 
     switch (toolName) {
@@ -262,6 +287,268 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           );
         }
         break;
+
+      // --- Added Cases for Phase 2B ---
+      case "etherscan_getInternalTransactions":
+        const internalTxResponse: EtherscanInternalTxListResponse =
+          await etherscanClient.getInternalTransactions(validatedArgs);
+        console.error(
+          `[Server:callTool][${toolName}] Etherscan API Status: ${internalTxResponse.status}, Message: ${internalTxResponse.message}`
+        );
+        if (internalTxResponse.status === "1") {
+          const txs = internalTxResponse.result;
+          if (txs.length === 0) {
+            resultText = `No internal transactions found for the specified parameters.`;
+          } else {
+            resultText =
+              `Found ${txs.length} internal transactions (latest ${
+                txs.length < 5 ? txs.length : 5
+              }):\n` +
+              txs
+                .slice(0, 5)
+                .map(
+                  (tx: EtherscanInternalTransaction) =>
+                    `- From: ${tx.from.substring(
+                      0,
+                      10
+                    )}... To: ${tx.to.substring(0, 10)}... Value: ${
+                      tx.value
+                    } wei (Parent Hash: ${tx.hash.substring(0, 10)}...)`
+                )
+                .join("\n");
+            if (txs.length > 5)
+              resultText += "\n... (more transactions available)";
+          }
+        } else {
+          resultText = `Etherscan API Error (${toolName}): ${
+            internalTxResponse.message || "Unknown API error"
+          } (Result: ${internalTxResponse.result})`;
+          console.error(
+            `[Server:callTool][${toolName}] API Error Response:`,
+            internalTxResponse
+          );
+        }
+        break;
+
+      case "etherscan_getTokenTransfers":
+        const tokenTxResponse: EtherscanTokenTxResponse =
+          await etherscanClient.getTokenTransfers(validatedArgs);
+        console.error(
+          `[Server:callTool][${toolName}] Etherscan API Status: ${tokenTxResponse.status}, Message: ${tokenTxResponse.message}`
+        );
+        if (tokenTxResponse.status === "1") {
+          const txs = tokenTxResponse.result;
+          if (txs.length === 0) {
+            resultText = `No token transfers found for the specified parameters.`;
+          } else {
+            resultText =
+              `Found ${txs.length} token transfers (latest ${
+                txs.length < 5 ? txs.length : 5
+              }):\n` +
+              txs
+                .slice(0, 5)
+                .map(
+                  (tx: EtherscanTokenTransfer) =>
+                    `- Token: ${tx.tokenSymbol} (${
+                      tx.tokenName
+                    }) From: ${tx.from.substring(
+                      0,
+                      10
+                    )}... To: ${tx.to.substring(0, 10)}... Value/ID: ${
+                      tx.value
+                    } (Hash: ${tx.hash.substring(0, 10)}...)`
+                )
+                .join("\n");
+            if (txs.length > 5)
+              resultText += "\n... (more transfers available)";
+          }
+        } else {
+          resultText = `Etherscan API Error (${toolName}): ${
+            tokenTxResponse.message || "Unknown API error"
+          } (Result: ${tokenTxResponse.result})`;
+          console.error(
+            `[Server:callTool][${toolName}] API Error Response:`,
+            tokenTxResponse
+          );
+        }
+        break;
+
+      case "etherscan_getMinedBlocks":
+        const minedBlocksResponse: EtherscanMinedBlocksResponse =
+          await etherscanClient.getMinedBlocks(validatedArgs);
+        console.error(
+          `[Server:callTool][${toolName}] Etherscan API Status: ${minedBlocksResponse.status}, Message: ${minedBlocksResponse.message}`
+        );
+        if (minedBlocksResponse.status === "1") {
+          const blocks = minedBlocksResponse.result;
+          if (blocks.length === 0) {
+            resultText = `No blocks found validated by ${validatedArgs.address}.`;
+          } else {
+            resultText =
+              `Found ${blocks.length} blocks validated by ${
+                validatedArgs.address
+              } (latest ${blocks.length < 5 ? blocks.length : 5}):\n` +
+              blocks
+                .slice(0, 5)
+                .map(
+                  (block: EtherscanMinedBlock) =>
+                    `- Block: ${block.blockNumber} Reward: ${
+                      block.blockReward
+                    } wei @ ${new Date(
+                      parseInt(block.timeStamp) * 1000
+                    ).toLocaleString()}`
+                )
+                .join("\n");
+            if (blocks.length > 5)
+              resultText += "\n... (more blocks available)";
+          }
+        } else {
+          resultText = `Etherscan API Error (${toolName}): ${
+            minedBlocksResponse.message || "Unknown API error"
+          } (Result: ${minedBlocksResponse.result})`;
+          console.error(
+            `[Server:callTool][${toolName}] API Error Response:`,
+            minedBlocksResponse
+          );
+        }
+        break;
+      // --- End Added Cases ---
+
+      // --- Added Cases for Phase 3 ---
+      case "etherscan_getSourceCode":
+        const sourceCodeResponse: EtherscanGetSourceCodeResponse =
+          await etherscanClient.getSourceCode(validatedArgs);
+        console.error(
+          `[Server:callTool][${toolName}] Etherscan API Status: ${sourceCodeResponse.status}, Message: ${sourceCodeResponse.message}`
+        );
+        if (
+          sourceCodeResponse.status === "1" &&
+          sourceCodeResponse.result.length > 0
+        ) {
+          // Assuming result is always an array with one item for source code
+          const sourceInfo = sourceCodeResponse.result[0];
+          // Format the output - potentially large, so maybe summarize
+          resultText =
+            `Source Code Info for ${validatedArgs.address}:\n` +
+            `Contract Name: ${sourceInfo.ContractName}\n` +
+            `Compiler Version: ${sourceInfo.CompilerVersion}\n` +
+            `Optimization Used: ${
+              sourceInfo.OptimizationUsed === "1" ? "Yes" : "No"
+            }\n` +
+            `ABI: ${
+              sourceInfo.ABI.length > 100
+                ? sourceInfo.ABI.substring(0, 100) + "..."
+                : sourceInfo.ABI
+            }\n` + // Truncate ABI
+            `Source Code: ${
+              sourceInfo.SourceCode.length > 200
+                ? sourceInfo.SourceCode.substring(0, 200) + "..."
+                : sourceInfo.SourceCode
+            }`; // Truncate Source
+        } else {
+          resultText = `Etherscan API Error or No Source Code Found (${toolName}): ${
+            sourceCodeResponse.message ||
+            "Contract source code not verified or API error"
+          } (Result: ${JSON.stringify(sourceCodeResponse.result)})`;
+          console.error(
+            `[Server:callTool][${toolName}] API Error/No Data Response:`,
+            sourceCodeResponse
+          );
+        }
+        break;
+
+      case "etherscan_getAbi":
+        const abiResponse: EtherscanGetAbiResponse =
+          await etherscanClient.getAbi(validatedArgs);
+        console.error(
+          `[Server:callTool][${toolName}] Etherscan API Status: ${abiResponse.status}, Message: ${abiResponse.message}`
+        );
+        if (
+          abiResponse.status === "1" &&
+          abiResponse.result !== "Contract source code not verified"
+        ) {
+          // Try to parse ABI for basic validation/formatting
+          try {
+            const abiJson = JSON.parse(abiResponse.result);
+            resultText = `ABI for ${validatedArgs.address}:\n${JSON.stringify(
+              abiJson,
+              null,
+              2
+            )}`;
+          } catch (parseError) {
+            console.error(
+              `[Server:callTool][${toolName}] Failed to parse ABI JSON:`,
+              parseError
+            );
+            resultText = `Received ABI for ${validatedArgs.address}, but failed to parse as JSON. Raw ABI:\n${abiResponse.result}`;
+          }
+        } else {
+          resultText = `Etherscan API Error or ABI Not Found (${toolName}): ${
+            abiResponse.message ||
+            "Contract source code not verified or API error"
+          } (Result: ${abiResponse.result})`;
+          console.error(
+            `[Server:callTool][${toolName}] API Error/No Data Response:`,
+            abiResponse
+          );
+        }
+        break;
+      // --- End Added Cases ---
+
+      // --- Added Cases for Phase 4 ---
+      case "etherscan_getTokenSupply":
+        const tokenSupplyResponse: EtherscanTokenSupplyResponse =
+          await etherscanClient.getTokenSupply(validatedArgs);
+        console.error(
+          `[Server:callTool][${toolName}] Etherscan API Status: ${tokenSupplyResponse.status}, Message: ${tokenSupplyResponse.message}`
+        );
+        if (tokenSupplyResponse.status === "1") {
+          resultText = `Total supply for ${validatedArgs.contractaddress}: ${tokenSupplyResponse.result}`;
+          // Note: Handler doesn't know decimals here, returning raw supply string. Client might need to fetch decimals separately.
+        } else {
+          resultText = `Etherscan API Error (${toolName}): ${
+            tokenSupplyResponse.message || "Unknown API error"
+          } (Result: ${tokenSupplyResponse.result})`;
+          console.error(
+            `[Server:callTool][${toolName}] API Error Response:`,
+            tokenSupplyResponse
+          );
+        }
+        break;
+
+      case "etherscan_getTokenInfo":
+        const tokenInfoResponse: EtherscanTokenInfoResponse =
+          await etherscanClient.getTokenInfo(validatedArgs);
+        console.error(
+          `[Server:callTool][${toolName}] Etherscan API Status: ${tokenInfoResponse.status}, Message: ${tokenInfoResponse.message}`
+        );
+        if (
+          tokenInfoResponse.status === "1" &&
+          tokenInfoResponse.result.length > 0
+        ) {
+          const tokenInfo: EtherscanTokenInfo = tokenInfoResponse.result[0];
+          // Format the output nicely
+          resultText =
+            `Token Info for ${validatedArgs.contractaddress}:\n` +
+            `Name: ${tokenInfo.tokenName}\n` +
+            `Symbol: ${tokenInfo.symbol}\n` +
+            `Type: ${tokenInfo.tokenType}\n` +
+            `Decimals: ${tokenInfo.divisor}\n` +
+            `Total Supply (raw): ${tokenInfo.totalSupply}\n` +
+            `Website: ${tokenInfo.website || "N/A"}\n` +
+            `Description: ${tokenInfo.description || "N/A"}\n` +
+            `Price (USD): ${tokenInfo.tokenPriceUSD || "N/A"}`;
+        } else {
+          resultText = `Etherscan API Error or No Token Info Found (${toolName}): ${
+            tokenInfoResponse.message || "API error or no data"
+          } (Result: ${JSON.stringify(tokenInfoResponse.result)})`;
+          console.error(
+            `[Server:callTool][${toolName}] API Error/No Data Response:`,
+            tokenInfoResponse
+          );
+        }
+        break;
+      // --- End Added Cases ---
 
       default:
         // Log error to stderr

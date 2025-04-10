@@ -46,61 +46,61 @@ This document outlines the phased plan for building the Etherscan MCP server.
 | 2A.6 | **Accounts Testing (Completed):** Use `mcp run tool` (or Inspector) to test `etherscan.getBalance`, `etherscan.getMultiBalance`, `etherscan.getNormalTransactions` (`txlist`) with valid/invalid addresses and chain IDs. | `[X]`  |
 | 2A.7 | Document test results/findings for Phase 2A completed tests.                                                                                                                                                              | `[ ]`  |
 
-## Phase 2B: Accounts Module - Remaining Implementation (Pending)
+## Phase 2B: Accounts Module - Remaining Implementation (Completed)
 
 - **Goals:** Implement the remaining Accounts module actions: `txlistinternal`, `tokentx`, `getminedblocks`.
 
 | Step | Task Description                                                                                                                                                                                        | Status |
 | :--- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | :----- |
-| 2B.1 | **Accounts:** Define specific response interfaces in `src/utils/types.ts` for `txlistinternal`, `tokentx`, `getminedblocks` (e.g., `InternalTxListResponse`, `TokenTxResponse`, `MinedBlocksResponse`). | `[ ]`  |
-| 2B.2 | **Accounts:** Implement methods in `EtherscanClient` for `txlistinternal`, `tokentx`, `getminedblocks`.                                                                                                 | `[ ]`  |
-| 2B.3 | **Accounts:** Define MCP tools in `account.ts` using `mcp.createTool` for `txlistinternal`, `tokentx`, `getminedblocks` (use Zod `inputSchema`).                                                        | `[ ]`  |
-| 2B.4 | **Accounts:** Register `txlistinternal`, `tokentx`, `getminedblocks` tools in `src/index.ts`.                                                                                                           | `[ ]`  |
+| 2B.1 | **Accounts:** Define specific response interfaces in `src/utils/types.ts` for `txlistinternal`, `tokentx`, `getminedblocks` (e.g., `InternalTxListResponse`, `TokenTxResponse`, `MinedBlocksResponse`). | `[X]`  |
+| 2B.2 | **Accounts:** Implement methods in `EtherscanClient` for `txlistinternal`, `tokentx`, `getminedblocks`.                                                                                                 | `[X]`  |
+| 2B.3 | **Accounts:** Define MCP tools in `account.ts` using `mcp.createTool` for `txlistinternal`, `tokentx`, `getminedblocks` (use Zod `inputSchema`).                                                        | `[X]`  |
+| 2B.4 | **Accounts:** Register `txlistinternal`, `tokentx`, `getminedblocks` tools in `src/index.ts`.                                                                                                           | `[X]`  |
 
-## Phase 2C: Accounts Module - Remaining Testing (Pending)
+## Phase 2C: Accounts Module - Remaining Testing (Completed)
 
 - **Goals:** Test the remaining Accounts module actions implemented in Phase 2B.
 
-| Step | Task Description                                                                                                                                          | Status |
-| :--- | :-------------------------------------------------------------------------------------------------------------------------------------------------------- | :----- |
-| 2C.1 | **Accounts Testing (Pending):** Test `etherscan.getInternalTransactions` (`txlistinternal`) with appropriate parameters (address, blocks, pagination).    | `[ ]`  |
-| 2C.2 | **Accounts Testing (Pending):** Test `etherscan.getTokenTransfers` (`tokentx`) with appropriate parameters (address/contractaddress, blocks, pagination). | `[ ]`  |
-| 2C.3 | **Accounts Testing (Pending):** Test `etherscan.getMinedBlocks` (`getminedblocks`) with appropriate parameters (address).                                 | `[ ]`  |
-| 2C.4 | Document test results/findings for Phase 2C tests once completed.                                                                                         | `[ ]`  |
+| Step | Task Description                                                                                                                                                                                                                                 | Status |
+| :--- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :----- |
+| 2C.1 | **Accounts Testing (Completed):** Test `etherscan.getInternalTransactions` (`txlistinternal`) with appropriate parameters (address, blocks, pagination).                                                                                         | `[X]`  |
+| 2C.2 | **Accounts Testing (Completed):** Test `etherscan.getTokenTransfers` (`tokentx`) with appropriate parameters (address/contractaddress, blocks, pagination).                                                                                      | `[X]`  |
+| 2C.3 | **Accounts Testing (Completed):** Test `etherscan.getMinedBlocks` (`getminedblocks`) with appropriate parameters (address).                                                                                                                      | `[X]`  |
+| 2C.4 | Document test results/findings for Phase 2C tests once completed. **Findings:** All Phase 2B tools (`getInternalTransactions`, `getTokenTransfers`, `getMinedBlocks`) tested successfully via MCP Inspector/`use_mcp_tool` after server restart. | `[X]`  |
 
-## Phase 3: Contracts Module - Implementation & Testing (Goal Priority)
+## Phase 3: Contracts Module - Implementation & Testing (Completed)
 
 - **Goals:** Implement and test endpoints for the Contracts module, focusing on `getsourcecode`.
 
-| Step | Task Description                                                                                                                           | Status |
-| :--- | :----------------------------------------------------------------------------------------------------------------------------------------- | :----- |
-| 3.1  | **Contracts:** Define specific response interfaces in `src/utils/types.ts` (e.g., `GetSourceCodeResponse`, `GetAbiResponse`).              | `[ ]`  |
-| 3.2  | **Contracts:** Implement client method `getSourceCode` in `EtherscanClient`.                                                               | `[ ]`  |
-| 3.3  | **Contracts:** Implement client method `getAbi` in `EtherscanClient`.                                                                      | `[ ]`  |
-| 3.4  | **Contracts:** Create `src/tools/contract.ts`.                                                                                             | `[ ]`  |
-| 3.5  | **Contracts:** Define MCP tool `etherscan.getSourceCode` in `contract.ts` using `mcp.createTool` (Zod `inputSchema` for address, chainid). | `[ ]`  |
-| 3.6  | **Contracts:** Define MCP tool `etherscan.getAbi` in `contract.ts` using `mcp.createTool` (Zod `inputSchema` for address, chainid).        | `[ ]`  |
-| 3.7  | **Contracts:** Register `getSourceCode` and `getAbi` tools in `src/index.ts`.                                                              | `[ ]`  |
-| 3.8  | **Contracts Testing:** Test `etherscan.getSourceCode` using `mcp run tool` with verified/unverified contract addresses and chain IDs.      | `[ ]`  |
-| 3.9  | **Contracts Testing:** Test `etherscan.getAbi` using `mcp run tool` with verified/unverified contract addresses and chain IDs.             | `[ ]`  |
-| 3.10 | Document test results/findings for Phase 3.                                                                                                | `[ ]`  |
+| Step | Task Description                                                                                                                                               | Status |
+| :--- | :------------------------------------------------------------------------------------------------------------------------------------------------------------- | :----- |
+| 3.1  | **Contracts:** Define specific response interfaces in `src/utils/types.ts` (e.g., `GetSourceCodeResponse`, `GetAbiResponse`).                                  | `[X]`  |
+| 3.2  | **Contracts:** Implement client method `getSourceCode` in `EtherscanClient`.                                                                                   | `[X]`  |
+| 3.3  | **Contracts:** Implement client method `getAbi` in `EtherscanClient`.                                                                                          | `[X]`  |
+| 3.4  | **Contracts:** Create `src/tools/contract.ts`.                                                                                                                 | `[X]`  |
+| 3.5  | **Contracts:** Define MCP tool `etherscan.getSourceCode` in `contract.ts` using `mcp.createTool` (Zod `inputSchema` for address, chainid).                     | `[X]`  |
+| 3.6  | **Contracts:** Define MCP tool `etherscan.getAbi` in `contract.ts` using `mcp.createTool` (Zod `inputSchema` for address, chainid).                            | `[X]`  |
+| 3.7  | **Contracts:** Register `getSourceCode` and `getAbi` tools in `src/index.ts`.                                                                                  | `[X]`  |
+| 3.8  | **Contracts Testing (Completed):** Test `etherscan.getSourceCode` using `use_mcp_tool` with verified contract address (USDT) and chain ID 1.                   | `[X]`  |
+| 3.9  | **Contracts Testing (Completed):** Test `etherscan.getAbi` using `use_mcp_tool` with verified contract address (USDT) and chain ID 1.                          | `[X]`  |
+| 3.10 | Document test results/findings for Phase 3. **Findings:** Both `getSourceCode` and `getAbi` tools tested successfully via `use_mcp_tool` after server restart. | `[X]`  |
 
-## Phase 4: Tokens Module - Implementation & Testing (Goal Priority)
+## Phase 4: Tokens Module - Implementation & Testing (Completed)
 
 - **Goals:** Implement and test endpoints for the Tokens module, focusing on `tokensupply`.
 
-| Step | Task Description                                                                                                                              | Status |
-| :--- | :-------------------------------------------------------------------------------------------------------------------------------------------- | :----- |
-| 4.1  | **Tokens:** Define specific response interfaces in `src/utils/types.ts` (e.g., `TokenSupplyResponse`, `TokenInfoResponse`).                   | `[ ]`  |
-| 4.2  | **Tokens:** Implement client method `getTokenSupply` in `EtherscanClient`.                                                                    | `[ ]`  |
-| 4.3  | **Tokens:** Implement client method `getTokenInfo` (optional, if desired) in `EtherscanClient`.                                               | `[ ]`  |
-| 4.4  | **Tokens:** Create `src/tools/token.ts`.                                                                                                      | `[ ]`  |
-| 4.5  | **Tokens:** Define MCP tool `etherscan.getTokenSupply` in `token.ts` using `mcp.createTool` (Zod `inputSchema` for contractaddress, chainid). | `[ ]`  |
-| 4.6  | **Tokens:** Define MCP tool `etherscan.getTokenInfo` (optional) in `token.ts`.                                                                | `[ ]`  |
-| 4.7  | **Tokens:** Register `getTokenSupply` and other token tools in `src/index.ts`.                                                                | `[ ]`  |
-| 4.8  | **Tokens Testing:** Test `etherscan.getTokenSupply` using `mcp run tool` with valid token contract addresses and chain IDs.                   | `[ ]`  |
-| 4.9  | **Tokens Testing:** Test `etherscan.getTokenInfo` (if implemented) using `mcp run tool`.                                                      | `[ ]`  |
-| 4.10 | Document test results/findings for Phase 4.                                                                                                   | `[ ]`  |
+| Step | Task Description                                                                                                                                                      | Status |
+| :--- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :----- |
+| 4.1  | **Tokens:** Define specific response interfaces in `src/utils/types.ts` (e.g., `TokenSupplyResponse`, `TokenInfoResponse`).                                           | `[X]`  |
+| 4.2  | **Tokens:** Implement client method `getTokenSupply` in `EtherscanClient`.                                                                                            | `[X]`  |
+| 4.3  | **Tokens:** Implement client method `getTokenInfo` (optional, if desired) in `EtherscanClient`.                                                                       | `[X]`  |
+| 4.4  | **Tokens:** Create `src/tools/token.ts`.                                                                                                                              | `[X]`  |
+| 4.5  | **Tokens:** Define MCP tool `etherscan.getTokenSupply` in `token.ts` using `mcp.createTool` (Zod `inputSchema` for contractaddress, chainid).                         | `[X]`  |
+| 4.6  | **Tokens:** Define MCP tool `etherscan.getTokenInfo` (optional) in `token.ts`.                                                                                        | `[X]`  |
+| 4.7  | **Tokens:** Register `getTokenSupply` and other token tools in `src/index.ts`.                                                                                        | `[X]`  |
+| 4.8  | **Tokens Testing (Completed):** Test `etherscan.getTokenSupply` using `use_mcp_tool` with valid token contract address (USDT) and chain ID 1.                         | `[X]`  |
+| 4.9  | **Tokens Testing (Completed):** Test `etherscan.getTokenInfo` (if implemented) using `use_mcp_tool` with valid token contract address (USDT) and chain ID 1.          | `[X]`  |
+| 4.10 | Document test results/findings for Phase 4. **Findings:** Both `getTokenSupply` and `getTokenInfo` tools tested successfully via `use_mcp_tool` after server restart. | `[X]`  |
 
 ## Phase 5: Transactions Module - Implementation & Testing
 
