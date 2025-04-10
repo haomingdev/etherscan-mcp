@@ -33,8 +33,12 @@ import { accountToolDefinitions, McpToolDefinition } from "./tools/account.js";
 import { contractToolDefinitions } from "./tools/contract.js";
 import { tokenToolDefinitions } from "./tools/token.js";
 import { transactionToolDefinitions } from "./tools/transaction.js"; // Added import for transaction tools
-import { EtherscanBalanceResponse } from "./utils/types.js"; // Import response types for handling
+import {
+  EtherscanBalanceResponse,
+  EtherscanGetLogsResponse,
+} from "./utils/types.js"; // Import response types for handling
 import { zodToJsonSchema } from "zod-to-json-schema"; // Import the conversion function
+import { logTools } from "./tools/log.js"; // Added import for log tools
 
 // Combine all tool definitions
 const allToolDefinitions = [
@@ -42,6 +46,7 @@ const allToolDefinitions = [
   ...contractToolDefinitions,
   ...tokenToolDefinitions,
   ...transactionToolDefinitions, // Added transaction tools
+  ...logTools, // Added log tools
 ];
 
 // Load environment variables from .env file
@@ -200,7 +205,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       | EtherscanTokenSupplyResponse
       | EtherscanTokenInfoResponse
       | TxReceiptStatusResponse // Added
-      | TxExecutionStatusResponse; // Added
+      | TxExecutionStatusResponse // Added
+      | EtherscanGetLogsResponse; // Added for logs
     let resultText: string;
 
     switch (toolName) {
@@ -620,6 +626,49 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
         break;
       // --- End Added Cases ---
+
+      // --- Added Case for Phase 6 ---
+      case "etherscan_getLogs":
+        const logsResponse: EtherscanGetLogsResponse =
+          await etherscanClient.getLogs(validatedArgs);
+        console.error(
+          `[Server:callTool][${toolName}] Etherscan API Status: ${logsResponse.status}, Message: ${logsResponse.message}`
+        );
+        if (logsResponse.status === "1") {
+          const logs = logsResponse.result;
+          if (logs.length === 0) {
+            resultText = `No logs found matching the specified criteria.`;
+          } else {
+            // Format log list concisely
+            resultText =
+              `Found ${logs.length} logs (latest ${
+                logs.length < 5 ? logs.length : 5
+              }):\n` +
+              logs
+                .slice(0, 5)
+                .map(
+                  (log) =>
+                    `- TxHash: ${log.transactionHash.substring(
+                      0,
+                      10
+                    )}... Address: ${log.address.substring(0, 10)}... Topics: ${
+                      log.topics.length
+                    }`
+                )
+                .join("\n");
+            if (logs.length > 5) resultText += "\n... (more logs available)";
+          }
+        } else {
+          resultText = `Etherscan API Error (${toolName}): ${
+            logsResponse.message || "Unknown API error"
+          } (Result: ${JSON.stringify(logsResponse.result)})`;
+          console.error(
+            `[Server:callTool][${toolName}] API Error Response:`,
+            logsResponse
+          );
+        }
+        break;
+      // --- End Added Case ---
 
       default:
         // Log error to stderr

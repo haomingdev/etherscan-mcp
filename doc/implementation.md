@@ -123,15 +123,15 @@ This document outlines the phased plan for building the Etherscan MCP server.
 
 - **Goals:** Implement and test endpoints for the Logs module.
 
-| Step | Task Description                                                                                                                     | Status |
-| :--- | :----------------------------------------------------------------------------------------------------------------------------------- | :----- |
-| 6.1  | **Logs:** Define specific response interfaces in `src/utils/types.ts` (e.g., `GetLogsResponse`).                                     | `[ ]`  |
-| 6.2  | **Logs:** Implement client method `getLogs` in `EtherscanClient`.                                                                    | `[ ]`  |
-| 6.3  | **Logs:** Create `src/tools/log.ts`.                                                                                                 | `[ ]`  |
-| 6.4  | **Logs:** Define MCP tool `etherscan.getLogs` in `log.ts` (Zod `inputSchema` for address, topics, blocks, chainid).                  | `[ ]`  |
-| 6.5  | **Logs:** Register `getLogs` tool in `src/index.ts`.                                                                                 | `[ ]`  |
-| 6.6  | **Logs Testing:** Test `etherscan.getLogs` using `mcp run tool`, focusing on different topic/address/block parameters and chain IDs. | `[ ]`  |
-| 6.7  | Document test results/findings for Phase 6.                                                                                          | `[ ]`  |
+| Step | Task Description                                                                                                                                                                                                                                                             | Status |
+| :--- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :----- |
+| 6.1  | **Logs:** Define specific response interfaces in `src/utils/types.ts` (e.g., `GetLogsResponse`).                                                                                                                                                                             | `[X]`  |
+| 6.2  | **Logs:** Implement client method `getLogs` in `EtherscanClient`.                                                                                                                                                                                                            | `[X]`  |
+| 6.3  | **Logs:** Create `src/tools/log.ts`.                                                                                                                                                                                                                                         | `[X]`  |
+| 6.4  | **Logs:** Define MCP tool `etherscan.getLogs` in `log.ts` (Zod `inputSchema` for address, topics, blocks, chainid).                                                                                                                                                          | `[X]`  |
+| 6.5  | **Logs:** Register `getLogs` tool in `src/index.ts`.                                                                                                                                                                                                                         | `[X]`  |
+| 6.6  | **Logs Testing:** Test `etherscan.getLogs` using `mcp run tool`, focusing on different topic/address/block parameters and chain IDs.                                                                                                                                         | `[X]`  |
+| 6.7  | Document test results/findings for Phase 6. **Findings:** `etherscan_getLogs` tested successfully via `use_mcp_tool` after server restart. Tests included basic fetch (USDT contract, block range), topic filtering (USDT transfers), and invalid input (missing `chainId`). | `[X]`  |
 
 ## Phase 7: Remaining Modules (Geth/Proxy, Gas Tracker, Stats) - Implementation & Testing
 

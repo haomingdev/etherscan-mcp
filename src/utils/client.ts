@@ -12,6 +12,7 @@ import {
   EtherscanTokenInfoResponse,
   TxReceiptStatusResponse, // Added for Transaction module
   TxExecutionStatusResponse, // Added for Transaction module
+  EtherscanGetLogsResponse, // Added for Logs module
 } from "./types.js";
 
 // Optional: Define a custom error class
@@ -480,6 +481,65 @@ export class EtherscanClient {
       action: "getstatus", // Correct action for execution status
       txhash: params.txhash,
     });
+  }
+
+  // --- Logs Module Methods ---
+
+  /**
+   * Get event logs matching specified criteria.
+   * Module: logs, Action: getLogs
+   * Supports filtering by block range, address, and topics.
+   * Note: Pagination parameters (page, offset) might have limitations or specific behavior with logs.
+   */
+  async getLogs(params: {
+    chainId: number;
+    fromBlock?: number | "latest";
+    toBlock?: number | "latest";
+    address?: string;
+    // Topics are 32-byte hex strings (0x...)
+    topic0?: string;
+    topic1?: string;
+    topic2?: string;
+    topic3?: string;
+    // Topic operators ('and'/'or')
+    topic0_1_opr?: "and" | "or";
+    topic1_2_opr?: "and" | "or";
+    topic2_3_opr?: "and" | "or";
+    topic0_2_opr?: "and" | "or";
+    topic0_3_opr?: "and" | "or";
+    topic1_3_opr?: "and" | "or";
+    // Pagination (use with caution, check Etherscan docs for behavior)
+    page?: number;
+    offset?: number;
+  }): Promise<EtherscanGetLogsResponse> {
+    console.error(
+      `[EtherscanClient:getLogs] Fetching logs for chain ${params.chainId}`
+    );
+
+    const queryParams: Record<string, string | number> = {
+      module: "logs",
+      action: "getLogs",
+    };
+
+    // Add optional parameters if they exist
+    if (params.fromBlock !== undefined)
+      queryParams.fromBlock = params.fromBlock;
+    if (params.toBlock !== undefined) queryParams.toBlock = params.toBlock;
+    if (params.address) queryParams.address = params.address;
+    if (params.topic0) queryParams.topic0 = params.topic0;
+    if (params.topic1) queryParams.topic1 = params.topic1;
+    if (params.topic2) queryParams.topic2 = params.topic2;
+    if (params.topic3) queryParams.topic3 = params.topic3;
+    if (params.topic0_1_opr) queryParams.topic0_1_opr = params.topic0_1_opr;
+    if (params.topic1_2_opr) queryParams.topic1_2_opr = params.topic1_2_opr;
+    if (params.topic2_3_opr) queryParams.topic2_3_opr = params.topic2_3_opr;
+    if (params.topic0_2_opr) queryParams.topic0_2_opr = params.topic0_2_opr;
+    if (params.topic0_3_opr) queryParams.topic0_3_opr = params.topic0_3_opr;
+    if (params.topic1_3_opr) queryParams.topic1_3_opr = params.topic1_3_opr;
+    if (params.page !== undefined) queryParams.page = params.page;
+    if (params.offset !== undefined) queryParams.offset = params.offset;
+
+    return this._request<EtherscanGetLogsResponse>(params.chainId, queryParams);
   }
 
   // Add other methods here for other modules (logs, etc.)

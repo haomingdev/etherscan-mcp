@@ -242,4 +242,30 @@ export interface TxExecutionStatusResponse extends EtherscanBaseResponse {
   };
 }
 
+// --- Logs Module Types ---
+
+/**
+ * Structure of a single log entry returned by the 'logs' module, 'getLogs' action.
+ * Based on https://docs.etherscan.io/api-endpoints/logs
+ */
+export interface EtherscanLogEntry {
+  address: string; // Address from which this log originated
+  topics: string[]; // Array of 0 to 4 32-byte data fields (indexed log arguments)
+  data: string; // Contains the non-indexed arguments of the log
+  blockNumber: string; // Block number where this log was in, hex string (e.g., "0x10d4f")
+  timeStamp: string; // Timestamp for the block, hex string (e.g., "0x5a97f5d9")
+  gasPrice: string; // Gas price for the transaction, hex string
+  gasUsed: string; // Gas used by the transaction, hex string
+  logIndex: string; // Log index position in the block, hex string (e.g., "0x0")
+  transactionHash: string; // Hash of the transaction this log was created from
+  transactionIndex: string; // Transaction index position log was created from, hex string (e.g., "0x0")
+}
+
+/**
+ * Response for 'logs' module, 'getLogs' action.
+ */
+export interface EtherscanGetLogsResponse extends EtherscanBaseResponse {
+  result: EtherscanLogEntry[];
+}
+
 // We will add more specific response types here later for other modules (Logs, etc.)
