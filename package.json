@@ -5,21 +5,23 @@
   "private": true,
   "type": "module",
   "bin": {
-    "etherscan-mcp": "./build/index.js"
+    "etherscan-mcp": "./dist/index.js"
   },
   "files": [
-    "build"
+    "dist"
   ],
   "scripts": {
-    "build": "tsc && node -e \"require('fs').chmodSync('build/index.js', '755')\"",
+    "build": "tsc && node -e \"require('fs').chmodSync('dist/index.js', '755')\"",
     "prepare": "npm run build",
     "watch": "tsc --watch",
-    "inspector": "npx @modelcontextprotocol/inspector build/index.js"
+    "inspector": "npx @modelcontextprotocol/inspector dist/index.js",
+    "start": "node dist/index.js"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "0.6.0",
+    "@modelcontextprotocol/sdk": "^0.6.0",
     "axios": "^1.8.4",
-    "dotenv": "^16.4.7"
+    "dotenv": "^16.4.7",
+    "zod-to-json-schema": "^3.24.5"
   },
   "devDependencies": {
     "@types/node": "^20.11.24",
