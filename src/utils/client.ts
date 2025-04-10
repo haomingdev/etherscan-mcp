@@ -13,6 +13,23 @@ export class EtherscanError extends Error {
   }
 }
 
+// --- Interfaces ---
+// Generic Etherscan API response structure
+export interface EtherscanApiResponse<T> {
+  status: "1" | "0"; // "1" for success, "0" for error
+  message: string;
+  result: T;
+}
+
+// Interface for items in the multi-balance response
+export interface MultiBalanceResponseItem {
+  account: string;
+  balance: string; // Etherscan returns balance as a string (Wei)
+}
+
+// Specific response type for getMultiBalance
+export interface MultiBalanceApiResponse extends EtherscanApiResponse<MultiBalanceResponseItem[]> {}
+
 export class EtherscanClient {
   private readonly apiKey: string;
   private readonly axiosInstance: AxiosInstance;
@@ -169,6 +186,24 @@ export class EtherscanClient {
 
     return this._request<EtherscanTxListResponse>(params.chainId, queryParams);
   }
-  
+
+  /**
+   * Fetches the Ether balance for multiple addresses in a single call.
+   * @param addresses - An array of Ethereum addresses.
+   * @param chainId - The chain ID.
+   * @returns A promise that resolves with the full API response object.
+   */
+  async getMultiBalance(addresses: string[], chainId: number): Promise<MultiBalanceApiResponse> {
+    console.error(`[EtherscanClient:getMultiBalance] Fetching balances for ${addresses.length} addresses on chain ${chainId}`);
+    const response = await this._request<MultiBalanceApiResponse>(chainId, {
+      module: "account",
+      action: "balancemulti",
+      address: addresses.join(','), // Join addresses with comma for API
+      tag: "latest",
+    });
+    console.error(`[EtherscanClient:getMultiBalance] Received ${response.result.length} balance results.`);
+    return response;
+  }
+
   // Add other methods here for other modules (contracts, logs, etc.)
 }

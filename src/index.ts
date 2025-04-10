@@ -7,12 +7,17 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
-import { EtherscanClient } from "./utils/client.js";
-import { accountToolDefinitions, McpToolDefinition } from "./tools/account.js"; // Import definitions and type
 import {
-  EtherscanBalanceResponse,
+  EtherscanClient,
+  MultiBalanceApiResponse,
+  MultiBalanceResponseItem,
+} from "./utils/client.js";
+import {
   EtherscanTxListResponse,
-} from "./utils/types.js"; // Import response types for handling
+  EtherscanNormalTransaction,
+} from "./utils/types.js";
+import { accountToolDefinitions, McpToolDefinition } from "./tools/account.js"; // Import definitions and type
+import { EtherscanBalanceResponse } from "./utils/types.js"; // Import response types for handling
 import { zodToJsonSchema } from "zod-to-json-schema"; // Import the conversion function
 
 // Load environment variables from .env file
@@ -71,9 +76,13 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     (tool: McpToolDefinition) => {
       try {
         // Pass options to inline definitions instead of using $ref
-        const jsonSchema = zodToJsonSchema(tool.inputSchema, { $refStrategy: 'none' });
+        const jsonSchema = zodToJsonSchema(tool.inputSchema, {
+          $refStrategy: "none",
+        });
 
-        console.error(`[Server:listTools] Successfully converted schema for ${tool.name}`); // Log success
+        console.error(
+          `[Server:listTools] Successfully converted schema for ${tool.name}`
+        ); // Log success
 
         return {
           name: tool.name,
@@ -82,21 +91,34 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         };
       } catch (error: any) {
         // Log any error during conversion
-        console.error(`[Server:listTools] Error converting schema for ${tool.name}:`, error.message);
-        console.error("[Server:listTools] Zod Schema:", JSON.stringify(tool.inputSchema.shape, null, 2)); // Log the input schema shape
+        console.error(
+          `[Server:listTools] Error converting schema for ${tool.name}:`,
+          error.message
+        );
+        console.error(
+          "[Server:listTools] Zod Schema:",
+          JSON.stringify(tool.inputSchema.shape, null, 2)
+        ); // Log the input schema shape
         // Return a placeholder or rethrow, depending on desired behavior.
         // For now, let's return a minimal structure to potentially avoid crashing the map.
         return {
           name: tool.name,
           description: tool.description,
-          inputSchema: { type: "object", properties: {}, error: `Conversion failed: ${error.message}` }, // Placeholder schema
+          inputSchema: {
+            type: "object",
+            properties: {},
+            error: `Conversion failed: ${error.message}`,
+          }, // Placeholder schema
         };
       }
     }
   );
 
   // Log the final array before returning (even if some conversions failed)
-  console.error("[Server:listTools] Final tools structure:", JSON.stringify(toolsWithJsonSchema, null, 2));
+  console.error(
+    "[Server:listTools] Final tools structure:",
+    JSON.stringify(toolsWithJsonSchema, null, 2)
+  );
 
   return {
     tools: toolsWithJsonSchema,
@@ -144,7 +166,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     console.error(
       `[Server:callTool] Executing EtherscanClient method for ${toolName}...`
     );
-    let responseData: EtherscanBalanceResponse | EtherscanTxListResponse;
+    let responseData:
+      | EtherscanBalanceResponse
+      | EtherscanTxListResponse
+      | MultiBalanceApiResponse;
     let resultText: string;
 
     switch (toolName) {
@@ -168,14 +193,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         break;
 
       case "etherscan_getNormalTransactions":
-        responseData = await etherscanClient.getNormalTransactions(
-          validatedArgs
-        );
+        const response: EtherscanTxListResponse =
+          await etherscanClient.getNormalTransactions(validatedArgs);
         console.error(
-          `[Server:callTool][${toolName}] Etherscan API Status: ${responseData.status}, Message: ${responseData.message}`
+          `[Server:callTool][${toolName}] Etherscan API Status: ${response.status}, Message: ${response.message}`
         ); // Changed to stderr for now
-        if (responseData.status === "1") {
-          const txs = responseData.result as EtherscanTxListResponse["result"];
+        if (response.status === "1") {
+          const txs = response.result as EtherscanTxListResponse["result"];
           if (txs.length === 0) {
             resultText = `No normal transactions found for ${validatedArgs.address} within the specified parameters.`;
           } else {
@@ -187,7 +211,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               txs
                 .slice(0, 5)
                 .map(
-                  (tx) =>
+                  (tx: EtherscanNormalTransaction) =>
                     `- Hash: ${tx.hash.substring(0, 10)}... Value: ${
                       tx.value
                     } wei @ ${new Date(
@@ -201,11 +225,40 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         } else {
           // Etherscan API returned an error status
           resultText = `Etherscan API Error (${toolName}): ${
-            responseData.message || "Unknown API error"
-          } (Result: ${responseData.result})`;
+            response.message || "Unknown API error"
+          } (Result: ${response.result})`;
           console.error(
             `[Server:callTool][${toolName}] API Error Response:`,
-            responseData
+            response
+          );
+        }
+        break;
+
+      case "etherscan_getMultiBalance":
+        const multiBalanceResponse: MultiBalanceApiResponse =
+          await etherscanClient.getMultiBalance(
+            validatedArgs.addresses,
+            validatedArgs.chainId
+          );
+        console.error(
+          `[Server:callTool][${toolName}] Etherscan API Status: ${multiBalanceResponse.status}, Message: ${multiBalanceResponse.message}`
+        ); // Changed to stderr for now
+        if (multiBalanceResponse.status === "1") {
+          const balances = multiBalanceResponse.result;
+          const output = balances.map((balance: MultiBalanceResponseItem) => ({
+            // Add type for 'balance'
+            account: balance.account,
+            balance: balance.balance,
+          }));
+          resultText = JSON.stringify(output, null, 2);
+        } else {
+          // Etherscan API returned an error status
+          resultText = `Etherscan API Error (${toolName}): ${
+            multiBalanceResponse.message || "Unknown API error"
+          } (Result: ${multiBalanceResponse.result})`;
+          console.error(
+            `[Server:callTool][${toolName}] API Error Response:`,
+            multiBalanceResponse
           );
         }
         break;
@@ -220,10 +273,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         );
     }
 
-    // 4. Format and return success response (even if Etherscan API had an error status)
-    console.error(
-      `[Server:callTool] Successfully processed ${toolName}. Etherscan API Status: ${responseData.status}`
-    ); // Changed to stderr for now
+    // 4. Format and return success response
     return {
       content: [
         {

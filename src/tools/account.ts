@@ -26,6 +26,14 @@ const GetNormalTransactionsInputSchema = z.object({
   sort: z.enum(["asc", "desc"]).optional(),
 });
 
+// Schema for Get Multiple Balances
+const GetMultiBalanceInputSchema = z.object({
+  // Etherscan API expects comma-separated string, but array is better for tool input schema.
+  // We'll join the array in the handler before calling the client.
+  addresses: z.array(EthereumAddressSchema).min(1, "At least one address is required"),
+  chainId: ChainIdSchema,
+});
+
 // --- Tool Definitions (as plain objects) ---
 
 // Define the structure for our tool definitions
@@ -49,8 +57,16 @@ export const etherscan_getNormalTransactions_Def: McpToolDefinition = {
   inputSchema: GetNormalTransactionsInputSchema,
 };
 
+// Definition for Get Multiple Balances
+export const etherscan_getMultiBalance_Def: McpToolDefinition = {
+  name: "etherscan_getMultiBalance",
+  description: "Get the Ether balance for multiple addresses on a specific chain in a single call.",
+  inputSchema: GetMultiBalanceInputSchema,
+};
+
 // Array of all tool definition objects in this file
 export const accountToolDefinitions: McpToolDefinition[] = [
   etherscan_getBalance_Def,
   etherscan_getNormalTransactions_Def,
+  etherscan_getMultiBalance_Def,
 ];
