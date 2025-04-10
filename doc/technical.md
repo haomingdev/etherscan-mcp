@@ -39,7 +39,15 @@ This document provides the technical specification for the Etherscan Model Conte
 
 ### 1.4 References
 
-- [Etherscan V2 API Documentation](https://docs.etherscan.io/api-endpoints/accounts)
+- [Etherscan V2 API Documentation: Accounts](https://docs.etherscan.io/api-endpoints/accounts)
+- [Etherscan V2 API Documentation: Contracts](https://docs.etherscan.io/api-endpoints/contracts)
+- [Etherscan V2 API Documentation: Transactions](https://docs.etherscan.io/api-endpoints/stats)
+- [Etherscan V2 API Documentation: Blocks](https://docs.etherscan.io/api-endpoints/blocks)
+- [Etherscan V2 API Documentation: Logs](https://docs.etherscan.io/api-endpoints/logs)
+- [Etherscan V2 API Documentation: Gas Tracker](https://docs.etherscan.io/api-endpoints/gas-tracker)
+- [Etherscan V2 API Documentation: Tokens](https://docs.etherscan.io/api-endpoints/tokens)
+- [Etherscan V2 API Documentation: Stats](https://docs.etherscan.io/api-endpoints/stats-1)
+- [Etherscan V2 API Documentation: Geth/Proxy](https://docs.etherscan.io/api-endpoints/geth-parity-proxy)
 - [Model Context Protocol Specification](https://modelcontextprotocol.io/docs/spec)
 - [MCP SDK for TypeScript (`@mcp/server`)](https://github.com/modelcontextprotocol/typescript-sdk) (or relevant link if available)
 - Etherscan MCP Server [Overview.md](./overview.md)
