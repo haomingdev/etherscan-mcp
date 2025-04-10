@@ -13,6 +13,14 @@ import {
   TxReceiptStatusResponse, // Added for Transaction module
   TxExecutionStatusResponse, // Added for Transaction module
   EtherscanGetLogsResponse, // Added for Logs module
+  // --- Geth/Proxy Types ---
+  EtherscanHexStringResponse,
+  EtherscanGetBlockByNumberResponse,
+  EtherscanGetTransactionByHashResponse,
+  EtherscanGetTransactionByBlockNumberAndIndexResponse,
+  EtherscanGetTransactionReceiptResponse,
+  EtherscanSendRawTransactionResponse,
+  EtherscanEstimateGasResponse,
 } from "./types.js";
 
 // Optional: Define a custom error class
@@ -80,17 +88,20 @@ export class EtherscanClient {
     return url;
   }
 
-  // Simplified private helper method for making requests (placeholder)
+  // Helper for GET requests
+  // Return type is Promise<T> which should conform to EtherscanBaseResponse structure,
+  // even if synthesized for proxy requests.
   private async _request<T extends EtherscanBaseResponse>(
     chainId: number,
-    queryParams: Record<string, string | number>
+    queryParams: Record<string, string | number | boolean>
   ): Promise<T> {
     const baseUrl = this.getBaseUrl(chainId);
     const paramsWithKey = { ...queryParams, apikey: this.apiKey };
+    const isProxyRequest = queryParams.module === "proxy"; // Check if it's a proxy request
 
     console.error(
       `[EtherscanClient:_request] Making GET request to ${baseUrl} for chain ${chainId} with params:`,
-      Object.keys(paramsWithKey) // Log keys, not values (API key)
+      Object.keys(paramsWithKey).filter((k) => k !== "apikey") // Log keys, not values (API key)
     );
 
     try {
@@ -118,22 +129,68 @@ export class EtherscanClient {
         throw new EtherscanError("Invalid response format from Etherscan API");
       }
 
-      // Etherscan specific status check (status '0' means API error)
-      // IMPORTANT: We return the response even on error, as the message/result might be useful.
-      // The tool handler should check the status field.
-      if (response.data.status === "0") {
-        console.warn(
-          `[EtherscanClient:_request] Etherscan API returned error status: ${response.data.message}, Result: ${response.data.result}`
-        );
-        // Potentially throw here if we *never* want to return error responses to the handler
-        // throw new EtherscanError(response.data.message || 'Etherscan API Error');
-      } else {
-        console.error(
-          `[EtherscanClient:_request] Request successful (status ${response.data.status})`
-        );
-      }
+      // Type the raw response data more generically to handle different structures
+      const rawData: any = response.data;
 
-      return response.data;
+      // Handle response based on whether it's a proxy request or standard Etherscan request
+      if (isProxyRequest) {
+        // Check for JSON-RPC success (result field exists)
+        if (rawData && rawData.result !== undefined) {
+          console.error(
+            `[EtherscanClient:_request] Proxy request successful. Result: ${JSON.stringify(
+              rawData.result
+            )}`
+          );
+          // Synthesize a success EtherscanBaseResponse structure
+          return {
+            status: "1",
+            message: "OK", // Synthesized message
+            result: rawData.result,
+          } as T; // Cast to the expected specific EtherscanBaseResponse subtype
+        }
+        // Check for JSON-RPC error (error field exists)
+        else if (rawData && rawData.error) {
+          const errorMessage =
+            rawData.error.message || "Proxy request returned a JSON-RPC error";
+          console.error(
+            `[EtherscanClient:_request] Proxy request JSON-RPC error: ${errorMessage}`,
+            rawData.error
+          );
+          // Synthesize an error EtherscanBaseResponse structure
+          return {
+            status: "0",
+            message: errorMessage,
+            result: rawData.error, // Include the full error object in the result field
+          } as T;
+        }
+        // Handle unexpected proxy response format
+        else {
+          const errorMessage =
+            "Proxy request failed or returned unexpected format";
+          console.error(
+            `[EtherscanClient:_request] Proxy request error: ${errorMessage}`,
+            rawData
+          );
+          return {
+            status: "0",
+            message: errorMessage,
+            result: rawData || null,
+          } as T;
+        }
+      } else {
+        // Standard Etherscan module response handling (already conforms to EtherscanBaseResponse)
+        if (rawData.status === "0") {
+          console.warn(
+            `[EtherscanClient:_request] Etherscan API returned error status: ${rawData.message}, Result: ${rawData.result}`
+          );
+        } else {
+          console.error(
+            `[EtherscanClient:_request] Request successful (status ${rawData.status})`
+          );
+        }
+        // Cast rawData to T, assuming it matches the expected EtherscanBaseResponse subtype
+        return rawData as T;
+      }
     } catch (error) {
       if (axios.isAxiosError(error)) {
         console.error(
@@ -542,5 +599,424 @@ export class EtherscanClient {
     return this._request<EtherscanGetLogsResponse>(params.chainId, queryParams);
   }
 
-  // Add other methods here for other modules (logs, etc.)
+  // Add other methods here for other modules (Gas Tracker, Stats)
+
+  // Helper for POST requests (needed for eth_sendRawTransaction)
+  // Return type is Promise<T> which should conform to EtherscanBaseResponse structure,
+  // even if synthesized for proxy requests.
+  private async _postRequest<T extends EtherscanBaseResponse>(
+    chainId: number,
+    payload: Record<string, string | number>
+  ): Promise<T> {
+    const baseUrl = this.getBaseUrl(chainId);
+    const isProxyRequest = payload.module === "proxy"; // Check if it's a proxy request
+
+    // Prepare query params (always include module, action, apikey)
+    const queryParams = {
+      module: payload.module,
+      action: payload.action,
+      apikey: this.apiKey,
+    };
+
+    // Prepare POST body data (exclude module, action, apikey)
+    const postData: Record<string, string | number> = {};
+    for (const key in payload) {
+      if (key !== "module" && key !== "action" && key !== "apikey") {
+        postData[key] = payload[key];
+      }
+    }
+
+    console.error(
+      `[EtherscanClient:_postRequest] Making POST request to ${baseUrl} for chain ${chainId} with query:`,
+      Object.keys(queryParams).filter((k) => k !== "apikey"),
+      "and body keys:",
+      Object.keys(postData)
+    );
+
+    try {
+      // Send POST request with query parameters and data in the body
+      // Etherscan POST often uses x-www-form-urlencoded, let axios handle it
+      const response = await this.axiosInstance.post<T>(baseUrl, postData, {
+        params: queryParams,
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/x-www-form-urlencoded", // Common for Etherscan POST
+        },
+      });
+
+      // Basic validation (same as _request)
+      if (response.status !== 200) {
+        console.error(
+          `[EtherscanClient:_postRequest] HTTP Error: ${response.status} ${response.statusText}`
+        );
+        throw new EtherscanError(
+          `HTTP Error: ${response.status} ${response.statusText}`
+        );
+      }
+      if (!response.data || typeof response.data !== "object") {
+        console.error(
+          "[EtherscanClient:_postRequest] Invalid response format from Etherscan API",
+          response.data
+        );
+        throw new EtherscanError("Invalid response format from Etherscan API");
+      }
+
+      // Type the raw response data more generically
+      const rawData: any = response.data;
+
+      // Handle response based on whether it's a proxy request or standard Etherscan request
+      if (isProxyRequest) {
+        // Check for JSON-RPC success (result field exists)
+        if (rawData && rawData.result !== undefined) {
+          console.error(
+            `[EtherscanClient:_postRequest] Proxy POST request successful. Result: ${JSON.stringify(
+              rawData.result
+            )}`
+          );
+          // Synthesize a success EtherscanBaseResponse structure
+          return {
+            status: "1",
+            message: "OK",
+            result: rawData.result,
+          } as T;
+        }
+        // Check for JSON-RPC error (error field exists)
+        else if (rawData && rawData.error) {
+          const errorMessage =
+            rawData.error.message ||
+            "Proxy POST request returned a JSON-RPC error";
+          console.error(
+            `[EtherscanClient:_postRequest] Proxy POST request JSON-RPC error: ${errorMessage}`,
+            rawData.error
+          );
+          // Synthesize an error EtherscanBaseResponse structure
+          return {
+            status: "0",
+            message: errorMessage,
+            result: rawData.error, // Include the full error object
+          } as T;
+        }
+        // Handle unexpected proxy response format
+        else {
+          const errorMessage =
+            "Proxy POST request failed or returned unexpected format";
+          console.error(
+            `[EtherscanClient:_postRequest] Proxy POST request error: ${errorMessage}`,
+            rawData
+          );
+          return {
+            status: "0",
+            message: errorMessage,
+            result: rawData || null,
+          } as T;
+        }
+      } else {
+        // Standard Etherscan module response handling
+        if (rawData.status === "0") {
+          console.warn(
+            `[EtherscanClient:_postRequest] Etherscan API returned error status: ${rawData.message}, Result: ${rawData.result}`
+          );
+        } else {
+          console.error(
+            `[EtherscanClient:_postRequest] Request successful (status ${rawData.status})`
+          );
+        }
+        // Cast rawData to T, assuming it matches the expected EtherscanBaseResponse subtype
+        return rawData as T;
+      }
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        console.error(
+          "[EtherscanClient:_postRequest] Axios Network/Request Error:",
+          error.message,
+          error.response?.status,
+          error.response?.data
+        );
+        throw new EtherscanError(`Network or Request Error: ${error.message}`);
+      } else {
+        console.error(
+          "[EtherscanClient:_postRequest] Unknown Error during request:",
+          error
+        );
+        throw error instanceof Error
+          ? error
+          : new EtherscanError("Unexpected Request Error: Unknown");
+      }
+    }
+  }
+
+  // --- Geth/Proxy Module Methods ---
+
+  /**
+   * Returns the number of most recent block.
+   * Module: proxy, Action: eth_blockNumber
+   */
+  async eth_blockNumber(params: {
+    chainId: number;
+  }): Promise<EtherscanHexStringResponse> {
+    console.error(
+      `[EtherscanClient:eth_blockNumber] Fetching for chain ${params.chainId}`
+    );
+    return this._request<EtherscanHexStringResponse>(params.chainId, {
+      module: "proxy",
+      action: "eth_blockNumber",
+    });
+  }
+
+  /**
+   * Returns information about a block by block number.
+   * Module: proxy, Action: eth_getBlockByNumber
+   */
+  async eth_getBlockByNumber(params: {
+    tag: string; // Hex block number or 'latest'
+    boolean: boolean; // true for full tx objects, false for hashes only
+    chainId: number;
+  }): Promise<EtherscanGetBlockByNumberResponse> {
+    console.error(
+      `[EtherscanClient:eth_getBlockByNumber] Fetching block ${params.tag} on chain ${params.chainId}`
+    );
+    return this._request<EtherscanGetBlockByNumberResponse>(params.chainId, {
+      module: "proxy",
+      action: "eth_getBlockByNumber",
+      tag: params.tag,
+      boolean: params.boolean,
+    });
+  }
+
+  /**
+   * Returns the number of transactions in a block from a block matching the given block number.
+   * Module: proxy, Action: eth_getBlockTransactionCountByNumber
+   */
+  async eth_getBlockTransactionCountByNumber(params: {
+    tag: string; // Hex block number or 'latest'
+    chainId: number;
+  }): Promise<EtherscanHexStringResponse> {
+    console.error(
+      `[EtherscanClient:eth_getBlockTransactionCountByNumber] Fetching tx count for block ${params.tag} on chain ${params.chainId}`
+    );
+    return this._request<EtherscanHexStringResponse>(params.chainId, {
+      module: "proxy",
+      action: "eth_getBlockTransactionCountByNumber",
+      tag: params.tag,
+    });
+  }
+
+  /**
+   * Returns the information about a transaction requested by transaction hash.
+   * Module: proxy, Action: eth_getTransactionByHash
+   */
+  async eth_getTransactionByHash(params: {
+    txhash: string;
+    chainId: number;
+  }): Promise<EtherscanGetTransactionByHashResponse> {
+    console.error(
+      `[EtherscanClient:eth_getTransactionByHash] Fetching tx ${params.txhash} on chain ${params.chainId}`
+    );
+    return this._request<EtherscanGetTransactionByHashResponse>(
+      params.chainId,
+      {
+        module: "proxy",
+        action: "eth_getTransactionByHash",
+        txhash: params.txhash,
+      }
+    );
+  }
+
+  /**
+   * Returns information about a transaction by block number and transaction index position.
+   * Module: proxy, Action: eth_getTransactionByBlockNumberAndIndex
+   */
+  async eth_getTransactionByBlockNumberAndIndex(params: {
+    tag: string; // Hex block number or 'latest'
+    index: string; // Hex transaction index
+    chainId: number;
+  }): Promise<EtherscanGetTransactionByBlockNumberAndIndexResponse> {
+    console.error(
+      `[EtherscanClient:eth_getTransactionByBlockNumberAndIndex] Fetching tx at index ${params.index} in block ${params.tag} on chain ${params.chainId}`
+    );
+    return this._request<EtherscanGetTransactionByBlockNumberAndIndexResponse>(
+      params.chainId,
+      {
+        module: "proxy",
+        action: "eth_getTransactionByBlockNumberAndIndex",
+        tag: params.tag,
+        index: params.index,
+      }
+    );
+  }
+
+  /**
+   * Returns the number of transactions sent from an address.
+   * Module: proxy, Action: eth_getTransactionCount
+   */
+  async eth_getTransactionCount(params: {
+    address: string;
+    tag: string; // 'latest', 'pending', 'earliest' or hex block number
+    chainId: number;
+  }): Promise<EtherscanHexStringResponse> {
+    console.error(
+      `[EtherscanClient:eth_getTransactionCount] Fetching tx count for address ${params.address} at tag ${params.tag} on chain ${params.chainId}`
+    );
+    return this._request<EtherscanHexStringResponse>(params.chainId, {
+      module: "proxy",
+      action: "eth_getTransactionCount",
+      address: params.address,
+      tag: params.tag,
+    });
+  }
+
+  /**
+   * Submits a pre-signed transaction for broadcast to the Ethereum network.
+   * Module: proxy, Action: eth_sendRawTransaction (POST Request)
+   */
+  async eth_sendRawTransaction(params: {
+    hex: string; // Signed transaction data in HEX format
+    chainId: number;
+  }): Promise<EtherscanSendRawTransactionResponse> {
+    console.error(
+      `[EtherscanClient:eth_sendRawTransaction] Sending raw tx on chain ${params.chainId}`
+    );
+    return this._postRequest<EtherscanSendRawTransactionResponse>(
+      params.chainId,
+      {
+        module: "proxy",
+        action: "eth_sendRawTransaction",
+        hex: params.hex,
+      }
+    );
+  }
+
+  /**
+   * Returns the receipt of a transaction by transaction hash.
+   * Module: proxy, Action: eth_getTransactionReceipt
+   */
+  async eth_getTransactionReceipt(params: {
+    txhash: string;
+    chainId: number;
+  }): Promise<EtherscanGetTransactionReceiptResponse> {
+    console.error(
+      `[EtherscanClient:eth_getTransactionReceipt] Fetching receipt for tx ${params.txhash} on chain ${params.chainId}`
+    );
+    return this._request<EtherscanGetTransactionReceiptResponse>(
+      params.chainId,
+      {
+        module: "proxy",
+        action: "eth_getTransactionReceipt",
+        txhash: params.txhash,
+      }
+    );
+  }
+
+  /**
+   * Executes a new message call immediately without creating a transaction on the block chain.
+   * Module: proxy, Action: eth_call
+   */
+  async eth_call(params: {
+    to: string; // Address to execute call against
+    data: string; // Hex encoded data (e.g., function selector and arguments)
+    tag: string; // 'latest', 'pending', 'earliest' or hex block number
+    chainId: number;
+  }): Promise<EtherscanHexStringResponse> {
+    console.error(
+      `[EtherscanClient:eth_call] Executing call to ${params.to} at tag ${params.tag} on chain ${params.chainId}`
+    );
+    return this._request<EtherscanHexStringResponse>(params.chainId, {
+      module: "proxy",
+      action: "eth_call",
+      to: params.to,
+      data: params.data,
+      tag: params.tag,
+    });
+  }
+
+  /**
+   * Returns code at a given address.
+   * Module: proxy, Action: eth_getCode
+   */
+  async eth_getCode(params: {
+    address: string;
+    tag: string; // 'latest', 'pending', 'earliest' or hex block number
+    chainId: number;
+  }): Promise<EtherscanHexStringResponse> {
+    console.error(
+      `[EtherscanClient:eth_getCode] Fetching code for address ${params.address} at tag ${params.tag} on chain ${params.chainId}`
+    );
+    return this._request<EtherscanHexStringResponse>(params.chainId, {
+      module: "proxy",
+      action: "eth_getCode",
+      address: params.address,
+      tag: params.tag,
+    });
+  }
+
+  /**
+   * Returns the value from a storage position at a given address.
+   * Module: proxy, Action: eth_getStorageAt
+   */
+  async eth_getStorageAt(params: {
+    address: string;
+    position: string; // Hex storage position
+    tag: string; // 'latest', 'pending', 'earliest' or hex block number
+    chainId: number;
+  }): Promise<EtherscanHexStringResponse> {
+    console.error(
+      `[EtherscanClient:eth_getStorageAt] Fetching storage at position ${params.position} for address ${params.address} at tag ${params.tag} on chain ${params.chainId}`
+    );
+    return this._request<EtherscanHexStringResponse>(params.chainId, {
+      module: "proxy",
+      action: "eth_getStorageAt",
+      address: params.address,
+      position: params.position,
+      tag: params.tag,
+    });
+  }
+
+  /**
+   * Returns the current price per gas in wei.
+   * Module: proxy, Action: eth_gasPrice
+   */
+  async eth_gasPrice(params: {
+    chainId: number;
+  }): Promise<EtherscanHexStringResponse> {
+    console.error(
+      `[EtherscanClient:eth_gasPrice] Fetching gas price for chain ${params.chainId}`
+    );
+    return this._request<EtherscanHexStringResponse>(params.chainId, {
+      module: "proxy",
+      action: "eth_gasPrice",
+    });
+  }
+
+  /**
+   * Makes a call or transaction, which won't be added to the blockchain and returns the used gas.
+   * Module: proxy, Action: eth_estimateGas
+   */
+  async eth_estimateGas(params: {
+    to: string;
+    value: string; // Hex value in wei
+    gasPrice?: string; // Hex gas price (legacy)
+    gas?: string; // Hex gas limit
+    data?: string; // Hex encoded data
+    chainId: number;
+  }): Promise<EtherscanEstimateGasResponse> {
+    console.error(
+      `[EtherscanClient:eth_estimateGas] Estimating gas for call to ${params.to} on chain ${params.chainId}`
+    );
+    const queryParams: Record<string, string | number> = {
+      module: "proxy",
+      action: "eth_estimateGas",
+      to: params.to,
+      value: params.value,
+    };
+    if (params.gasPrice) queryParams.gasPrice = params.gasPrice;
+    if (params.gas) queryParams.gas = params.gas;
+    if (params.data) queryParams.data = params.data;
+
+    return this._request<EtherscanEstimateGasResponse>(
+      params.chainId,
+      queryParams
+    );
+  }
+
+  // Add other methods here for other modules (Stats)
 }

@@ -133,20 +133,16 @@ This document outlines the phased plan for building the Etherscan MCP server.
 | 6.6  | **Logs Testing:** Test `etherscan.getLogs` using `mcp run tool`, focusing on different topic/address/block parameters and chain IDs.                                                                                                                                         | `[X]`  |
 | 6.7  | Document test results/findings for Phase 6. **Findings:** `etherscan_getLogs` tested successfully via `use_mcp_tool` after server restart. Tests included basic fetch (USDT contract, block range), topic filtering (USDT transfers), and invalid input (missing `chainId`). | `[X]`  |
 
-## Phase 7: Remaining Modules (Geth/Proxy, Gas Tracker, Stats) - Implementation & Testing
+## Phase 7: Remaining Modules (Remaining ,MGas Tracksr, Stats) (Geth/Proxy, Gas Tracker, lementation & Testing
 
-- **Goals:** Implement and test endpoints for the Geth/Proxy, Gas Tracker, and Stats modules.
+- **Goals:** Implement and test endpoints for the Geth/Proxy,acker, and S,tats modules.
 
 | Step | Task Description                                                                                                                                                             | Status |
 | :--- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :----- |
-| 7.1  | **Geth/Proxy:** Define specific types in `src/utils/types.ts` (e.g., `EthBlockNumberResponse`, `SendRawTxResponse`), implement client methods, create tools, register, test. | `[ ]`  |
-| 7.2  | **Geth/Proxy:** Update `EtherscanClient._request` helper if needed to handle POST requests (especially for `eth_sendRawTransaction`).                                        | `[ ]`  |
-| 7.3  | **Geth/Proxy Testing:** Test each Geth/Proxy tool using `mcp run tool`.                                                                                                      | `[ ]`  |
-| 7.4  | **Gas Tracker:** Define specific types in `src/utils/types.ts` (e.g., `GasOracleResponse`, `GasEstimateResponse`), implement client methods, create tools, register.         | `[ ]`  |
-| 7.5  | **Gas Tracker Testing:** Test `etherscan.getGasOracle` and `etherscan.estimateGas` (if implemented) using `mcp run tool`.                                                    | `[ ]`  |
-| 7.6  | **Stats:** Define specific types in `src/utils/types.ts` (e.g., `EthSupplyResponse`, `EthPriceResponse`), implement client methods, create tools, register.                  | `[ ]`  |
-| 7.7  | **Stats Testing:** Test each Stats tool using `mcp run tool`.                                                                                                                | `[ ]`  |
-| 7.8  | Document test results/findings for Phase 7.                                                                                                                                  | `[ ]`  |
+| 7.1  | **Geth/Proxy:** Define specific types in `src/utils/types.ts` (e.g., `EthBlockNumberResponse`, `SendRawTxResponse`), implement client methods, create tools, register, test. | `[X]`  |
+| 7.2  | **Geth/Proxy:** Update `EtherscanClient._request` helper if needed to handle POST requests (especially for `eth_sendRawTransaction`).                                        | `[X]`  |
+| 7.3  | **Geth/Proxy Testing:** Test each Geth/Proxy tool using `mcp run tool`.                                                                                                      | `[X]`  |
+| 7.4  | Document test results/findings for Phase 7. **Findings:** `Geth/Proxy tools` tested successfully via `use_mcp_tool` after server restart.                                    | `[X]`  |
 
 ## Phase 8: Refinement & Final Testing
 

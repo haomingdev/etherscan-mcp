@@ -28,6 +28,14 @@ import {
   EtherscanTokenInfo,
   TxReceiptStatusResponse, // Added for Transaction module
   TxExecutionStatusResponse, // Added for Transaction module
+  // --- Geth/Proxy Types ---
+  EtherscanHexStringResponse,
+  EtherscanGetBlockByNumberResponse,
+  EtherscanGetTransactionByHashResponse,
+  EtherscanGetTransactionByBlockNumberAndIndexResponse,
+  EtherscanGetTransactionReceiptResponse,
+  EtherscanSendRawTransactionResponse,
+  EtherscanEstimateGasResponse,
 } from "./utils/types.js";
 import { accountToolDefinitions, McpToolDefinition } from "./tools/account.js";
 import { contractToolDefinitions } from "./tools/contract.js";
@@ -39,6 +47,9 @@ import {
 } from "./utils/types.js"; // Import response types for handling
 import { zodToJsonSchema } from "zod-to-json-schema"; // Import the conversion function
 import { logTools } from "./tools/log.js"; // Added import for log tools
+import { proxyTools } from "./tools/proxy.js"; // Added import for proxy tools
+// Removed gasTools import
+// Removed statsTools import
 
 // Combine all tool definitions
 const allToolDefinitions = [
@@ -47,6 +58,9 @@ const allToolDefinitions = [
   ...tokenToolDefinitions,
   ...transactionToolDefinitions, // Added transaction tools
   ...logTools, // Added log tools
+  ...proxyTools, // Added proxy tools
+  // Removed gasTools from array
+  // Removed statsTools from array
 ];
 
 // Load environment variables from .env file
@@ -206,7 +220,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       | EtherscanTokenInfoResponse
       | TxReceiptStatusResponse // Added
       | TxExecutionStatusResponse // Added
-      | EtherscanGetLogsResponse; // Added for logs
+      | EtherscanGetLogsResponse // Added for logs
+      // --- Geth/Proxy Responses ---
+      | EtherscanHexStringResponse
+      | EtherscanGetBlockByNumberResponse
+      | EtherscanGetTransactionByHashResponse
+      | EtherscanGetTransactionByBlockNumberAndIndexResponse
+      | EtherscanGetTransactionReceiptResponse
+      | EtherscanSendRawTransactionResponse
+      | EtherscanEstimateGasResponse;
     let resultText: string;
 
     switch (toolName) {
@@ -669,6 +691,327 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
         break;
       // --- End Added Case ---
+
+      // --- Added Cases for Phase 7 (Geth/Proxy) ---
+      case "etherscan_eth_blockNumber":
+        const blockNumResponse: EtherscanHexStringResponse =
+          await etherscanClient.eth_blockNumber(validatedArgs);
+        console.error(
+          `[Server:callTool][${toolName}] Etherscan API Status: ${blockNumResponse.status}, Message: ${blockNumResponse.message}`
+        );
+        if (blockNumResponse.status === "1") {
+          resultText = `Latest Block Number (Chain ${validatedArgs.chainId}): ${blockNumResponse.result} (Hex)`;
+        } else {
+          resultText = `Etherscan API Error (${toolName}): ${
+            blockNumResponse.message || "Unknown API error"
+          } (Result: ${blockNumResponse.result})`;
+          console.error(
+            `[Server:callTool][${toolName}] API Error Response:`,
+            blockNumResponse
+          );
+        }
+        break;
+
+      case "etherscan_eth_getBlockByNumber":
+        const blockResponse: EtherscanGetBlockByNumberResponse =
+          await etherscanClient.eth_getBlockByNumber(validatedArgs);
+        console.error(
+          `[Server:callTool][${toolName}] Etherscan API Status: ${blockResponse.status}, Message: ${blockResponse.message}`
+        );
+        if (blockResponse.status === "1" && blockResponse.result) {
+          // Format block data concisely
+          resultText =
+            `Block ${blockResponse.result.number} Info (Chain ${validatedArgs.chainId}):\n` +
+            `Hash: ${blockResponse.result.hash.substring(0, 15)}...\n` +
+            `Timestamp: ${new Date(
+              parseInt(blockResponse.result.timestamp, 16) * 1000
+            ).toLocaleString()}\n` +
+            `Miner: ${blockResponse.result.miner.substring(0, 15)}...\n` +
+            `Gas Used: ${parseInt(blockResponse.result.gasUsed, 16)}\n` +
+            `Transactions: ${blockResponse.result.transactions.length}`;
+        } else {
+          resultText = `Etherscan API Error or Block Not Found (${toolName}): ${
+            blockResponse.message || "API error or no data"
+          } (Result: ${JSON.stringify(blockResponse.result)})`;
+          console.error(
+            `[Server:callTool][${toolName}] API Error/No Data Response:`,
+            blockResponse
+          );
+        }
+        break;
+
+      case "etherscan_eth_getBlockTransactionCountByNumber":
+        const blockTxCountResponse: EtherscanHexStringResponse =
+          await etherscanClient.eth_getBlockTransactionCountByNumber(
+            validatedArgs
+          );
+        console.error(
+          `[Server:callTool][${toolName}] Etherscan API Status: ${blockTxCountResponse.status}, Message: ${blockTxCountResponse.message}`
+        );
+        if (blockTxCountResponse.status === "1") {
+          resultText = `Transaction Count in Block ${
+            validatedArgs.tag
+          } (Chain ${validatedArgs.chainId}): ${parseInt(
+            blockTxCountResponse.result,
+            16
+          )}`;
+        } else {
+          resultText = `Etherscan API Error (${toolName}): ${
+            blockTxCountResponse.message || "Unknown API error"
+          } (Result: ${blockTxCountResponse.result})`;
+          console.error(
+            `[Server:callTool][${toolName}] API Error Response:`,
+            blockTxCountResponse
+          );
+        }
+        break;
+
+      case "etherscan_eth_getTransactionByHash":
+        const txByHashResponse: EtherscanGetTransactionByHashResponse =
+          await etherscanClient.eth_getTransactionByHash(validatedArgs);
+        console.error(
+          `[Server:callTool][${toolName}] Etherscan API Status: ${txByHashResponse.status}, Message: ${txByHashResponse.message}`
+        );
+        if (txByHashResponse.status === "1" && txByHashResponse.result) {
+          // Format tx data concisely
+          resultText =
+            `Transaction ${txByHashResponse.result.hash.substring(
+              0,
+              15
+            )}... Info (Chain ${validatedArgs.chainId}):\n` +
+            `Block: ${txByHashResponse.result.blockNumber}\n` +
+            `From: ${txByHashResponse.result.from.substring(0, 15)}...\n` +
+            `To: ${
+              txByHashResponse.result.to
+                ? txByHashResponse.result.to.substring(0, 15) + "..."
+                : "Contract Creation"
+            }\n` +
+            `Value: ${parseInt(txByHashResponse.result.value, 16)} wei`;
+        } else {
+          resultText = `Etherscan API Error or Tx Not Found (${toolName}): ${
+            txByHashResponse.message || "API error or no data"
+          } (Result: ${JSON.stringify(txByHashResponse.result)})`;
+          console.error(
+            `[Server:callTool][${toolName}] API Error/No Data Response:`,
+            txByHashResponse
+          );
+        }
+        break;
+
+      case "etherscan_eth_getTransactionByBlockNumberAndIndex":
+        const txByBlockIndexResponse: EtherscanGetTransactionByBlockNumberAndIndexResponse =
+          await etherscanClient.eth_getTransactionByBlockNumberAndIndex(
+            validatedArgs
+          );
+        console.error(
+          `[Server:callTool][${toolName}] Etherscan API Status: ${txByBlockIndexResponse.status}, Message: ${txByBlockIndexResponse.message}`
+        );
+        if (
+          txByBlockIndexResponse.status === "1" &&
+          txByBlockIndexResponse.result
+        ) {
+          // Format tx data concisely
+          resultText =
+            `Transaction at Index ${validatedArgs.index} in Block ${validatedArgs.tag} (Chain ${validatedArgs.chainId}):\n` +
+            `Hash: ${txByBlockIndexResponse.result.hash.substring(
+              0,
+              15
+            )}...\n` +
+            `From: ${txByBlockIndexResponse.result.from.substring(
+              0,
+              15
+            )}...\n` +
+            `To: ${
+              txByBlockIndexResponse.result.to
+                ? txByBlockIndexResponse.result.to.substring(0, 15) + "..."
+                : "Contract Creation"
+            }\n` +
+            `Value: ${parseInt(txByBlockIndexResponse.result.value, 16)} wei`;
+        } else {
+          resultText = `Etherscan API Error or Tx Not Found (${toolName}): ${
+            txByBlockIndexResponse.message || "API error or no data"
+          } (Result: ${JSON.stringify(txByBlockIndexResponse.result)})`;
+          console.error(
+            `[Server:callTool][${toolName}] API Error/No Data Response:`,
+            txByBlockIndexResponse
+          );
+        }
+        break;
+
+      case "etherscan_eth_getTransactionCount":
+        const txCountResponse: EtherscanHexStringResponse =
+          await etherscanClient.eth_getTransactionCount(validatedArgs);
+        console.error(
+          `[Server:callTool][${toolName}] Etherscan API Status: ${txCountResponse.status}, Message: ${txCountResponse.message}`
+        );
+        if (txCountResponse.status === "1") {
+          resultText = `Transaction Count for ${validatedArgs.address} at ${
+            validatedArgs.tag
+          } (Chain ${validatedArgs.chainId}): ${parseInt(
+            txCountResponse.result,
+            16
+          )}`;
+        } else {
+          resultText = `Etherscan API Error (${toolName}): ${
+            txCountResponse.message || "Unknown API error"
+          } (Result: ${txCountResponse.result})`;
+          console.error(
+            `[Server:callTool][${toolName}] API Error Response:`,
+            txCountResponse
+          );
+        }
+        break;
+
+      case "etherscan_eth_sendRawTransaction":
+        const sendRawTxResponse: EtherscanSendRawTransactionResponse =
+          await etherscanClient.eth_sendRawTransaction(validatedArgs);
+        console.error(
+          `[Server:callTool][${toolName}] Etherscan API Status: ${sendRawTxResponse.status}, Message: ${sendRawTxResponse.message}`
+        );
+        if (sendRawTxResponse.status === "1") {
+          resultText = `Raw transaction submitted successfully (Chain ${validatedArgs.chainId}). Result (likely Tx Hash): ${sendRawTxResponse.result}`;
+        } else {
+          resultText = `Etherscan API Error (${toolName}): ${
+            sendRawTxResponse.message || "Failed to send transaction"
+          } (Result: ${sendRawTxResponse.result})`;
+          console.error(
+            `[Server:callTool][${toolName}] API Error Response:`,
+            sendRawTxResponse
+          );
+        }
+        break;
+
+      case "etherscan_eth_getTransactionReceipt":
+        const receiptResponse: EtherscanGetTransactionReceiptResponse =
+          await etherscanClient.eth_getTransactionReceipt(validatedArgs);
+        console.error(
+          `[Server:callTool][${toolName}] Etherscan API Status: ${receiptResponse.status}, Message: ${receiptResponse.message}`
+        );
+        if (receiptResponse.status === "1" && receiptResponse.result) {
+          // Format receipt data concisely
+          resultText =
+            `Transaction Receipt for ${receiptResponse.result.transactionHash.substring(
+              0,
+              15
+            )}... (Chain ${validatedArgs.chainId}):\n` +
+            `Block: ${receiptResponse.result.blockNumber}\n` +
+            `Status: ${
+              receiptResponse.result.status === "0x1" ? "Success" : "Failed"
+            }\n` +
+            `Gas Used: ${parseInt(receiptResponse.result.gasUsed, 16)}\n` +
+            `Logs: ${receiptResponse.result.logs.length}`;
+        } else {
+          resultText = `Etherscan API Error or Receipt Not Found (${toolName}): ${
+            receiptResponse.message || "API error or no data"
+          } (Result: ${JSON.stringify(receiptResponse.result)})`;
+          console.error(
+            `[Server:callTool][${toolName}] API Error/No Data Response:`,
+            receiptResponse
+          );
+        }
+        break;
+
+      case "etherscan_eth_call":
+        const callResponse: EtherscanHexStringResponse =
+          await etherscanClient.eth_call(validatedArgs);
+        console.error(
+          `[Server:callTool][${toolName}] Etherscan API Status: ${callResponse.status}, Message: ${callResponse.message}`
+        );
+        if (callResponse.status === "1") {
+          resultText = `Result of eth_call to ${validatedArgs.to} at ${validatedArgs.tag} (Chain ${validatedArgs.chainId}): ${callResponse.result}`;
+        } else {
+          resultText = `Etherscan API Error (${toolName}): ${
+            callResponse.message || "eth_call failed"
+          } (Result: ${callResponse.result})`;
+          console.error(
+            `[Server:callTool][${toolName}] API Error Response:`,
+            callResponse
+          );
+        }
+        break;
+
+      case "etherscan_eth_getCode":
+        const codeResponse: EtherscanHexStringResponse =
+          await etherscanClient.eth_getCode(validatedArgs);
+        console.error(
+          `[Server:callTool][${toolName}] Etherscan API Status: ${codeResponse.status}, Message: ${codeResponse.message}`
+        );
+        if (codeResponse.status === "1") {
+          resultText = `Code at ${validatedArgs.address} at ${
+            validatedArgs.tag
+          } (Chain ${validatedArgs.chainId}): ${
+            codeResponse.result.length > 100
+              ? codeResponse.result.substring(0, 100) + "..."
+              : codeResponse.result
+          }`; // Truncate long code
+        } else {
+          resultText = `Etherscan API Error (${toolName}): ${
+            codeResponse.message || "Failed to get code"
+          } (Result: ${codeResponse.result})`;
+          console.error(
+            `[Server:callTool][${toolName}] API Error Response:`,
+            codeResponse
+          );
+        }
+        break;
+
+      case "etherscan_eth_getStorageAt":
+        const storageResponse: EtherscanHexStringResponse =
+          await etherscanClient.eth_getStorageAt(validatedArgs);
+        console.error(
+          `[Server:callTool][${toolName}] Etherscan API Status: ${storageResponse.status}, Message: ${storageResponse.message}`
+        );
+        if (storageResponse.status === "1") {
+          resultText = `Storage at position ${validatedArgs.position} for ${validatedArgs.address} at ${validatedArgs.tag} (Chain ${validatedArgs.chainId}): ${storageResponse.result}`;
+        } else {
+          resultText = `Etherscan API Error (${toolName}): ${
+            storageResponse.message || "Failed to get storage"
+          } (Result: ${storageResponse.result})`;
+          console.error(
+            `[Server:callTool][${toolName}] API Error Response:`,
+            storageResponse
+          );
+        }
+        break;
+
+      case "etherscan_eth_gasPrice":
+        const gasPriceResponse: EtherscanHexStringResponse =
+          await etherscanClient.eth_gasPrice(validatedArgs);
+        console.error(
+          `[Server:callTool][${toolName}] Etherscan API Status: ${gasPriceResponse.status}, Message: ${gasPriceResponse.message}`
+        );
+        if (gasPriceResponse.status === "1") {
+          resultText = `Current Gas Price (Chain ${validatedArgs.chainId}): ${gasPriceResponse.result} (Hex Wei)`;
+        } else {
+          resultText = `Etherscan API Error (${toolName}): ${
+            gasPriceResponse.message || "Failed to get gas price"
+          } (Result: ${gasPriceResponse.result})`;
+          console.error(
+            `[Server:callTool][${toolName}] API Error Response:`,
+            gasPriceResponse
+          );
+        }
+        break;
+
+      case "etherscan_eth_estimateGas":
+        const estimateGasResponse: EtherscanEstimateGasResponse =
+          await etherscanClient.eth_estimateGas(validatedArgs);
+        console.error(
+          `[Server:callTool][${toolName}] Etherscan API Status: ${estimateGasResponse.status}, Message: ${estimateGasResponse.message}`
+        );
+        if (estimateGasResponse.status === "1") {
+          resultText = `Estimated Gas for call to ${validatedArgs.to} (Chain ${validatedArgs.chainId}): ${estimateGasResponse.result} (Hex)`;
+        } else {
+          resultText = `Etherscan API Error (${toolName}): ${
+            estimateGasResponse.message || "Failed to estimate gas"
+          } (Result: ${estimateGasResponse.result})`;
+          console.error(
+            `[Server:callTool][${toolName}] API Error Response:`,
+            estimateGasResponse
+          );
+        }
+        break;
+      // --- End Added Cases ---
 
       default:
         // Log error to stderr

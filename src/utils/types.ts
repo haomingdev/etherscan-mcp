@@ -269,3 +269,152 @@ export interface EtherscanGetLogsResponse extends EtherscanBaseResponse {
 }
 
 // We will add more specific response types here later for other modules (Logs, etc.)
+
+// --- Geth/Proxy Module Types ---
+// Based on standard Ethereum JSON-RPC responses, wrapped in EtherscanBaseResponse
+
+/**
+ * Generic response for endpoints returning a single hex string value.
+ */
+export interface EtherscanHexStringResponse extends EtherscanBaseResponse {
+  result: string; // Hex string value (e.g., block number, gas price, count)
+}
+
+/**
+ * Structure for an Ethereum Block object (simplified).
+ * Based on https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_getblockbynumber
+ */
+export interface EtherscanBlockObject {
+  number: string; // Hex block number
+  hash: string; // Block hash
+  parentHash: string;
+  nonce: string;
+  sha3Uncles: string;
+  logsBloom: string;
+  transactionsRoot: string;
+  stateRoot: string;
+  receiptsRoot: string;
+  miner: string;
+  difficulty: string;
+  totalDifficulty: string;
+  extraData: string;
+  size: string; // Hex size in bytes
+  gasLimit: string; // Hex gas limit
+  gasUsed: string; // Hex gas used
+  timestamp: string; // Hex timestamp
+  transactions: string[] | EtherscanTransactionObject[]; // Array of tx hashes or full tx objects
+  uncles: string[];
+  // Etherscan might add specific fields
+  baseFeePerGas?: string; // EIP-1559
+}
+
+/**
+ * Response for 'proxy' module, 'eth_getBlockByNumber' action.
+ */
+export interface EtherscanGetBlockByNumberResponse
+  extends EtherscanBaseResponse {
+  result: EtherscanBlockObject | null;
+}
+
+/**
+ * Structure for an Ethereum Transaction object (simplified).
+ * Based on https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_gettransactionbyhash
+ */
+export interface EtherscanTransactionObject {
+  blockHash: string | null; // Null if pending
+  blockNumber: string | null; // Null if pending, hex
+  from: string;
+  gas: string; // Hex
+  gasPrice: string; // Hex
+  maxFeePerGas?: string; // EIP-1559, hex
+  maxPriorityFeePerGas?: string; // EIP-1559, hex
+  hash: string;
+  input: string;
+  nonce: string; // Hex
+  to: string | null; // Null for contract creation
+  transactionIndex: string | null; // Null if pending, hex
+  value: string; // Hex, value in wei
+  type: string; // Hex, e.g., '0x0', '0x2' for EIP-1559
+  accessList?: any[]; // EIP-2930
+  chainId: string; // Hex
+  v: string; // Hex signature component
+  r: string; // Hex signature component
+  s: string; // Hex signature component
+  // Etherscan might add specific fields
+  contractAddress?: string | null; // Address if contract creation
+}
+
+/**
+ * Response for 'proxy' module, 'eth_getTransactionByHash' action.
+ */
+export interface EtherscanGetTransactionByHashResponse
+  extends EtherscanBaseResponse {
+  result: EtherscanTransactionObject | null;
+}
+
+/**
+ * Response for 'proxy' module, 'eth_getTransactionByBlockNumberAndIndex' action.
+ */
+export interface EtherscanGetTransactionByBlockNumberAndIndexResponse
+  extends EtherscanBaseResponse {
+  result: EtherscanTransactionObject | null;
+}
+
+/**
+ * Structure for an Ethereum Transaction Receipt object (simplified).
+ * Based on https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_gettransactionreceipt
+ */
+export interface EtherscanTransactionReceiptObject {
+  transactionHash: string;
+  transactionIndex: string; // Hex
+  blockHash: string;
+  blockNumber: string; // Hex
+  from: string;
+  to: string | null; // Null for contract creation
+  cumulativeGasUsed: string; // Hex
+  gasUsed: string; // Hex
+  contractAddress: string | null; // Address if contract creation, null otherwise
+  logs: EtherscanLogEntry[]; // Array of log objects
+  logsBloom: string;
+  status: string; // Hex, '0x1' for success, '0x0' for failure
+  effectiveGasPrice: string; // Hex
+  type: string; // Hex transaction type
+  // Etherscan might add specific fields
+  root?: string; // Post-Byzantium, state root
+}
+
+/**
+ * Response for 'proxy' module, 'eth_getTransactionReceipt' action.
+ */
+export interface EtherscanGetTransactionReceiptResponse
+  extends EtherscanBaseResponse {
+  result: EtherscanTransactionReceiptObject | null;
+}
+
+/**
+ * Response for 'proxy' module, 'eth_sendRawTransaction' action.
+ * Can return the hash on success, or an error object structure on failure.
+ */
+export interface EtherscanSendRawTransactionResponse
+  extends EtherscanBaseResponse {
+  // Result is typically the tx hash on success (status='1')
+  // If status='0', result might contain error details, but often message holds the error.
+  // Let's assume result is the hash string if status='1'.
+  result: string | any; // Hex transaction hash or potentially error details if status=0
+}
+
+/**
+ * Response for 'proxy' module, 'eth_estimateGas' action.
+ * Can return the gas amount on success, or an error object structure on failure.
+ */
+export interface EtherscanEstimateGasResponse extends EtherscanBaseResponse {
+  // Result is the hex gas amount on success (status='1')
+  // If status='0', result might contain error details, but often message holds the error.
+  result: string | any; // Hex gas amount or potentially error details if status=0
+}
+
+// --- Gas Tracker Module Types ---
+// To be added later
+
+// --- Stats Module Types ---
+// To be added later
