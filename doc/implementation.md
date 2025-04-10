@@ -38,15 +38,15 @@ This document outlines the phased plan for building the Etherscan MCP server.
 
 | Step | Task Description                                                                                                                             | Status |
 | :--- | :------------------------------------------------------------------------------------------------------------------------------------------- | :----- |
-| 2.1  | **Accounts:** Define specific response interfaces in `src/utils/types.ts` (e.g., `BalanceResponse`, `TxListResponse`).                       | `[ ]`  |
-| 2.2  | **Accounts:** Implement methods in `EtherscanClient` for `balance`, `balancemulti`, `txlist`, `txlistinternal`, `tokentx`, `getminedblocks`. | `[ ]`  |
-| 2.3  | **Accounts:** Create `src/tools/accounts.ts`.                                                                                                | `[ ]`  |
-| 2.4  | **Accounts:** Define MCP tools in `accounts.ts` using `mcp.createTool` for each client method (use Zod `inputSchema`, `async handler`).      | `[ ]`  |
-| 2.5  | **Accounts:** Include `chainid` in tool `inputSchema` where applicable.                                                                      | `[ ]`  |
-| 2.6  | **Accounts:** Register account tools in `src/index.ts`.                                                                                      | `[ ]`  |
-| 2.7  | **Accounts Testing:** Test _each_ account tool using `mcp run tool etherscan.<toolName>` with valid/invalid inputs, various `chainid`.       | `[ ]`  |
-| 2.8  | **Transactions:** Define specific response interfaces in `src/utils/types.ts` for `getstatus`, `gettxreceiptstatus`.                         | `[ ]`  |
-| 2.9  | **Transactions:** Implement methods in `EtherscanClient` for `getstatus`, `gettxreceiptstatus`.                                              | `[ ]`  |
+| 2.1  | **Accounts:** Define specific response interfaces in `src/utils/types.ts` (e.g., `BalanceResponse`, `TxListResponse`).                       | `[X]`  |
+| 2.2  | **Accounts:** Implement methods in `EtherscanClient` for `balance`, `balancemulti`, `txlist`, `txlistinternal`, `tokentx`, `getminedblocks`. | `[X]`  |
+| 2.3  | **Accounts:** Create `src/tools/accounts.ts`.                                                                                                | `[X]`  |
+| 2.4  | **Accounts:** Define MCP tools in `accounts.ts` using `mcp.createTool` for each client method (use Zod `inputSchema`, `async handler`).      | `[X]`  |
+| 2.5  | **Accounts:** Register these tools in `src/index.ts` (import definitions, add to `server.capabilities.tools`, implement basic handlers).     | `[X]`  |
+| 2.6  | **Accounts Testing:** Use `mcp run tool` (or Inspector) to test *each* account tool (`getBalance`, `getMultiBalance`, `getNormalTransactions`) with valid/invalid addresses and chain IDs. | `[X]`  |
+| 2.7  | **Accounts Testing:** Test `etherscan_getInternalTransactions`, `etherscan_getTokenTransfers`, `etherscan_getMinedBlocks` with appropriate parameters.                                 | `[ ]`  |
+| 2.8  | Define response/request types in `src/utils/types.ts` for *Transactions* module endpoints (`gettxreceiptstatus`, `getstatus`).                                                            | `[ ]`  |
+| 2.9  | **Transactions:** Implement client methods in `EtherscanClient`.                                                                              | `[ ]`  |
 | 2.10 | **Transactions:** Create `src/tools/transactions.ts`.                                                                                        | `[ ]`  |
 | 2.11 | **Transactions:** Define MCP tools in `transactions.ts` using `mcp.createTool`.                                                              | `[ ]`  |
 | 2.12 | **Transactions:** Include `chainid` in tool `inputSchema` where needed.                                                                      | `[ ]`  |
