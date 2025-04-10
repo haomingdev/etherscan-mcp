@@ -130,54 +130,90 @@ interface McpToolDefinition {
 
 // --- Tool Definitions ---
 
+/**
+ * MCP Tool Definition: Get the number of the most recent block.
+ * Corresponds to Etherscan API module=proxy, action=eth_blockNumber.
+ */
 export const ethBlockNumberTool: McpToolDefinition = {
   name: "etherscan_eth_blockNumber",
   description: "Get the number of the most recent block.",
   inputSchema: EthBlockNumberInputSchema,
 };
 
+/**
+ * MCP Tool Definition: Get information about a block by block number.
+ * Corresponds to Etherscan API module=proxy, action=eth_getBlockByNumber.
+ */
 export const ethGetBlockByNumberTool: McpToolDefinition = {
   name: "etherscan_eth_getBlockByNumber",
   description: "Get information about a block by block number.",
   inputSchema: EthGetBlockByNumberInputSchema,
 };
 
+/**
+ * MCP Tool Definition: Get the number of transactions in a specific block.
+ * Corresponds to Etherscan API module=proxy, action=eth_getBlockTransactionCountByNumber.
+ */
 export const ethGetBlockTransactionCountByNumberTool: McpToolDefinition = {
   name: "etherscan_eth_getBlockTransactionCountByNumber",
   description: "Get the number of transactions in a specific block.",
   inputSchema: EthGetBlockTransactionCountByNumberInputSchema,
 };
 
+/**
+ * MCP Tool Definition: Get information about a transaction by hash.
+ * Corresponds to Etherscan API module=proxy, action=eth_getTransactionByHash.
+ */
 export const ethGetTransactionByHashTool: McpToolDefinition = {
   name: "etherscan_eth_getTransactionByHash",
   description: "Get information about a transaction by hash.",
   inputSchema: EthGetTransactionByHashInputSchema,
 };
 
+/**
+ * MCP Tool Definition: Get information about a transaction by block number and index.
+ * Corresponds to Etherscan API module=proxy, action=eth_getTransactionByBlockNumberAndIndex.
+ */
 export const ethGetTransactionByBlockNumberAndIndexTool: McpToolDefinition = {
   name: "etherscan_eth_getTransactionByBlockNumberAndIndex",
   description: "Get information about a transaction by block number and index.",
   inputSchema: EthGetTransactionByBlockNumberAndIndexInputSchema,
 };
 
+/**
+ * MCP Tool Definition: Get the number of transactions sent from an address.
+ * Corresponds to Etherscan API module=proxy, action=eth_getTransactionCount.
+ */
 export const ethGetTransactionCountTool: McpToolDefinition = {
   name: "etherscan_eth_getTransactionCount",
   description: "Get the number of transactions sent from an address.",
   inputSchema: EthGetTransactionCountInputSchema,
 };
 
+/**
+ * MCP Tool Definition: Submit a pre-signed transaction to the network (via POST).
+ * Corresponds to Etherscan API module=proxy, action=eth_sendRawTransaction.
+ */
 export const ethSendRawTransactionTool: McpToolDefinition = {
   name: "etherscan_eth_sendRawTransaction",
   description: "Submit a pre-signed transaction to the network (via POST).",
   inputSchema: EthSendRawTransactionInputSchema,
 };
 
+/**
+ * MCP Tool Definition: Get the receipt of a transaction by hash.
+ * Corresponds to Etherscan API module=proxy, action=eth_getTransactionReceipt.
+ */
 export const ethGetTransactionReceiptTool: McpToolDefinition = {
   name: "etherscan_eth_getTransactionReceipt",
   description: "Get the receipt of a transaction by hash.",
   inputSchema: EthGetTransactionReceiptInputSchema,
 };
 
+/**
+ * MCP Tool Definition: Execute a message call immediately without creating a transaction.
+ * Corresponds to Etherscan API module=proxy, action=eth_call.
+ */
 export const ethCallTool: McpToolDefinition = {
   name: "etherscan_eth_call",
   description:
@@ -185,24 +221,40 @@ export const ethCallTool: McpToolDefinition = {
   inputSchema: EthCallInputSchema,
 };
 
+/**
+ * MCP Tool Definition: Get the code at a given address.
+ * Corresponds to Etherscan API module=proxy, action=eth_getCode.
+ */
 export const ethGetCodeTool: McpToolDefinition = {
   name: "etherscan_eth_getCode",
   description: "Get the code at a given address.",
   inputSchema: EthGetCodeInputSchema,
 };
 
+/**
+ * MCP Tool Definition: Get the value from a storage position at a given address.
+ * Corresponds to Etherscan API module=proxy, action=eth_getStorageAt.
+ */
 export const ethGetStorageAtTool: McpToolDefinition = {
   name: "etherscan_eth_getStorageAt",
   description: "Get the value from a storage position at a given address.",
   inputSchema: EthGetStorageAtInputSchema,
 };
 
+/**
+ * MCP Tool Definition: Get the current price per gas in wei.
+ * Corresponds to Etherscan API module=proxy, action=eth_gasPrice.
+ */
 export const ethGasPriceTool: McpToolDefinition = {
   name: "etherscan_eth_gasPrice",
   description: "Get the current price per gas in wei.",
   inputSchema: EthGasPriceInputSchema,
 };
 
+/**
+ * MCP Tool Definition: Estimate the gas needed for a transaction without executing it.
+ * Corresponds to Etherscan API module=proxy, action=eth_estimateGas.
+ */
 export const ethEstimateGasTool: McpToolDefinition = {
   name: "etherscan_eth_estimateGas",
   description:

@@ -16,10 +16,10 @@ This document provides the technical specification for the Etherscan Model Conte
 - Wrapping key Etherscan V2 API endpoints (Accounts, Contracts, Transactions, Blocks, Logs, Gas Tracker, Tokens, Stats, Geth/Proxy) as individual MCP tools.
 - Handling Etherscan API key authentication via environment variables.
 - Supporting chain selection (`chainid`) as a common parameter for relevant tools.
-- Basic error handling and mapping of Etherscan API responses/errors.
-- Comprehensive logging for requests, responses, and errors within the server.
-- Adherence to the MCP Server Development Protocol, including rigorous testing.
-- Configuration instructions for running the server via `mcp install` or manual `settings.json`.
+- Error handling using `EtherscanError` and `McpError` for consistent reporting.
+- Comprehensive logging (`console.error`) for requests, responses, and errors within the server.
+- Adherence to the MCP Server Development Protocol, including E2E testing via a dedicated script (`test/e2e.ts`).
+- Configuration instructions for running the server via manual host settings (`settings.json` or similar).
 
 **Out of Scope:**
 
@@ -89,10 +89,10 @@ graph LR
 
 - **MCP Server Runtime (`@mcp/server` SDK):** Manages the MCP protocol handshake, message parsing/serialization, tool discovery (`listTools`), tool invocation (`callTool`), input/output validation (via Zod schemas), and transport handling (`stdio`).
 - **Main Server Entry Point (`src/index.ts`):** Initializes the MCP Server instance, loads environment variables (`dotenv`), instantiates the `EtherscanClient`, registers all defined tools with the SDK, and starts the server run loop.
-- **Tool Definitions (`src/tools/*.ts`):** Separate files defining each MCP tool using `mcp.createTool`. Each definition includes the tool's `name`, `description`, `inputSchema` (using Zod for validation), and the asynchronous `handler` function containing the core logic.
-- **Etherscan API Client (`src/utils/client.ts`):** A custom `EtherscanClient` class encapsulating the logic for interacting with the Etherscan API. It holds the API key, constructs request URLs, uses `axios` to make HTTP requests, and performs initial response validation/error mapping.
+- **Tool Definitions (`src/tools/*.ts`):** Separate files defining tool metadata (`name`, `description`, `inputSchema` using Zod) as plain objects.
+- **Etherscan API Client (`src/utils/client.ts`):** A custom `EtherscanClient` class encapsulating the logic for interacting with the Etherscan API. It holds the API key, constructs request URLs, uses `axios` to make HTTP requests, performs response validation, and throws `EtherscanError` on failures.
 - **HTTP Request Library (`axios`):** Used by `EtherscanClient` to perform the actual HTTP GET/POST requests to the Etherscan API.
-- **Utilities (`src/utils/*.ts`):** May include shared TypeScript types/interfaces (`types.ts`), custom error classes (`errors.ts`), and potentially constants (`constants.ts`).
+- **Utilities (`src/utils/*.ts`):** Includes shared TypeScript types/interfaces (`types.ts`) and the custom `EtherscanError` class (defined within `client.ts`).
 
 ### 2.3 Design Choices & Rationale
 
@@ -160,19 +160,26 @@ The primary external interface is the Model Context Protocol itself, exposed via
 
 ### 4.2 Data Formats / Models (Tool Definitions)
 
-Each tool exposed by the server adheres to the MCP Tool definition structure:
+Each tool is defined as a plain object with metadata, and the execution logic is centralized in `src/index.ts`.
 
 ```typescript
-{
-  name: string; // Unique tool name (e.g., "etherscan.getBalance")
+// Example structure in src/tools/*.ts
+export interface McpToolDefinition {
+  name: string; // Unique tool name (e.g., "etherscan_getBalance")
   description: string; // User-friendly description
-  inputSchema: ZodSchema; // Zod schema defining expected input parameters
-  // outputSchema?: ZodSchema; // Optional: Zod schema for validating output
-  handler: (input: z.infer<typeof inputSchema>) => Promise<any>; // Async function
+  inputSchema: z.ZodTypeAny; // Zod schema defining expected input parameters
 }
+
+export const exampleToolDef: McpToolDefinition = {
+  name: "etherscan_exampleTool",
+  description: "An example tool.",
+  inputSchema: z.object({
+    /* ... Zod schema ... */
+  }),
+};
 ```
 
-Common input parameters like `chainid: number` will be included in the `inputSchema` for most tools.
+The `inputSchema` (Zod) is converted to JSON Schema by the server when responding to `tools/list`. Common input parameters like `chainId: number` are included in the `inputSchema` for relevant tools.
 
 ### 4.3 Endpoint/Method Definitions (Conceptual MCP Interactions)
 
@@ -348,8 +355,9 @@ etherscan-mcp/
 ### 9.1 Testing Levels
 
 - **MCP Tool Testing (Manual/CLI - CRITICAL):** Use `mcp run tool <server_id>.<tool_name> '{ "param": "value" }'` extensively for _each_ tool. Test valid inputs, edge cases, invalid inputs (rejected by Zod), different `chainid` values, and verify outputs against Etherscan documentation/website. This is the primary acceptance testing method mandated by the MCP Development Protocol.
-- **Unit Testing (Optional but Recommended):** Use a framework like Jest or Vitest to test the logic within `EtherscanClient` methods (mocking `axios`) and potentially utility functions.
-- **Integration Testing (Optional):** Could involve tests that spin up the server and use an MCP client library (like `@mcp/client`) to make actual `tools/call` requests, potentially hitting a staging/testnet Etherscan endpoint if available (or using recorded responses).
+- **End-to-End Testing (Primary):** A dedicated script (`test/e2e.ts`) uses the `@mcp/client` SDK to connect to the running server via stdio and execute a predefined suite of `tools/call` requests covering various tools, parameters, and chains. Results are logged to the console. This was the main method used for Phase 8 validation.
+- **Manual Testing (During Development):** Using `mcp run tool` or the MCP Inspector during feature implementation.
+- **Unit Testing (Not Implemented):** No unit tests were created for this project, relying instead on E2E testing.
 
 ### 9.2 Test Environments
 
@@ -372,10 +380,8 @@ etherscan-mcp/
 
 - **Build:** Run `npm run build` (which executes `tsc`) to compile TypeScript to JavaScript in the `dist/` directory.
 - **Packaging:** The deployment artifact is the content of the `dist/` directory plus `package.json`, `node_modules` (or `npm install --production` in the target environment).
-- **Registration:** The server needs to be registered with the MCP host environment:
-  - **CLI:** `mcp install ./dist/index.js -n etherscan -e ETHERSCAN_API_KEY=...`
-  - **Manual:** Editing the host's `settings.json` as detailed in `implementation.md`.
-- **CI/CD:** Not explicitly defined, but could automate build, testing, and potentially packaging.
+- **Registration:** The server needs to be registered manually with the MCP host environment by editing the host's configuration file (`settings.json` for VS Code, `claude_desktop_config.json` for Desktop App) as detailed in `README.md`. This allows setting the required `ETHERSCAN_API_KEY` environment variable.
+- **CI/CD:** Not implemented.
 
 ### 10.2 Infrastructure Requirements
 
@@ -425,157 +431,174 @@ _(Placeholder for detailed tool schemas, complex diagrams, etc., if needed later
 
 ## Appendix C: Code Examples
 
-These snippets illustrate the core implementation patterns for the Etherscan MCP Server using TypeScript and the `@mcp/server` SDK.
+These snippets illustrate the core implementation patterns used in this Etherscan MCP Server.
 
 ### C.1 Basic Server Initialization (`src/index.ts` Snippet)
 
 ```typescript
-import { Server } from "@mcp/server";
 import dotenv from "dotenv";
-import { EtherscanClient } from "./utils/client"; // Assuming EtherscanClient is in utils
-// Import defined tools
-import { getBalanceTool } from "./tools/accounts";
-// ... import other tools
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import {
+  CallToolRequestSchema,
+  ListToolsRequestSchema,
+  McpError,
+  ErrorCode,
+} from "@modelcontextprotocol/sdk/types.js";
+import { EtherscanClient, EtherscanError } from "./utils/client.js";
+import { zodToJsonSchema } from "zod-to-json-schema";
+// Import combined tool definitions array (assuming it's defined elsewhere)
+import { allToolDefinitions, McpToolDefinition } from "./tools/index.js"; // Example import
 
-// Load environment variables from .env file
+// Load environment variables
 dotenv.config();
+const apiKey = process.env.ETHERSCAN_API_KEY;
+if (!apiKey) {
+  console.error("FATAL: ETHERSCAN_API_KEY environment variable not set.");
+  process.exit(1);
+}
 
-async function main() {
-  // Retrieve API key securely
-  const apiKey = process.env.ETHERSCAN_API_KEY;
-  if (!apiKey) {
-    console.error("FATAL: ETHERSCAN_API_KEY environment variable not set.");
-    process.exit(1);
+// Initialize Client
+let etherscanClient: EtherscanClient;
+try {
+  etherscanClient = new EtherscanClient(apiKey);
+} catch (error: any) {
+  console.error("[Setup] Failed to initialize EtherscanClient:", error.message);
+  process.exit(1);
+}
+
+// Initialize MCP Server
+const server = new Server(
+  { name: "etherscan-mcp", version: "0.1.0" }, // Server Info
+  { capabilities: { tools: {} } } // Server Options (declaring tools capability)
+);
+
+// Handler for listing tools
+server.setRequestHandler(ListToolsRequestSchema, async () => {
+  const toolsWithJsonSchema = allToolDefinitions.map((tool) => ({
+    name: tool.name,
+    description: tool.description,
+    inputSchema: zodToJsonSchema(tool.inputSchema, { $refStrategy: "none" }),
+  }));
+  return { tools: toolsWithJsonSchema };
+});
+
+// Central handler for calling tools
+server.setRequestHandler(CallToolRequestSchema, async (request) => {
+  const toolName = request.params.name;
+  const tool = allToolDefinitions.find((t) => t.name === toolName);
+
+  if (!tool) {
+    throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${toolName}`);
   }
 
-  console.error("[Setup] Initializing Etherscan MCP Server...");
+  // Validate input
+  const validationResult = tool.inputSchema.safeParse(request.params.arguments);
+  if (!validationResult.success) {
+    throw new McpError(
+      ErrorCode.InvalidParams,
+      `Invalid input for tool ${toolName}: ${JSON.stringify(
+        validationResult.error.format()
+      )}`
+    );
+  }
+  const validatedArgs = validationResult.data as any;
 
-  // Instantiate the Etherscan API client
-  const etherscanClient = new EtherscanClient(apiKey);
+  try {
+    let resultText: string;
+    // --- Central Switch Statement for Tool Logic ---
+    switch (toolName) {
+      case "etherscan_getBalance":
+        const balanceResponse = await etherscanClient.getBalance(validatedArgs);
+        resultText = `Balance: ${balanceResponse.result} wei`;
+        break;
+      // ... other cases calling etherscanClient methods ...
+      default:
+        throw new Error(`Tool ${toolName} handler not implemented.`);
+    }
 
-  // Create the MCP Server instance
-  // The server ID 'etherscan' should match configuration in settings.json or mcp install
-  const mcp = new Server({
-    name: "etherscan-mcp", // Informational name
-    id: "etherscan", // Critical ID for MCP routing
-    version: "1.0.0",
-  });
+    return { content: [{ type: "text", text: resultText }] };
+  } catch (error: any) {
+    console.error(`[Server:callTool] Error executing ${toolName}:`, error);
+    if (error instanceof McpError) throw error;
+    if (error instanceof EtherscanError) {
+      throw new McpError(
+        ErrorCode.InternalError,
+        `Etherscan Client Error: ${error.message}`
+      );
+    }
+    throw new McpError(
+      ErrorCode.InternalError,
+      `Unexpected error: ${error.message || "Unknown"}`
+    );
+  }
+});
 
-  // Declare server capabilities
-  mcp.setCapabilities({
-    tools: { listChanged: false }, // Declaring tool capability
-    // resources: {}, // Not implementing resources
-    // prompts: {},   // Not implementing prompts
-  });
-
-  // Register tools with the MCP server
-  // Pass the etherscanClient instance to tools if they need it directly
-  // (Alternatively, tools could import a singleton instance)
-  mcp.registerTool(getBalanceTool(etherscanClient));
-  // ... mcp.registerTool(getTransactionsTool(etherscanClient));
-  // ... etc.
-
-  console.error("[Setup] Tools registered. Starting server run loop...");
-
-  // Start the server's main run loop.
-  // The SDK handles transport (e.g., stdio) automatically based on how it's launched.
-  await mcp.run();
-
-  console.error("[Shutdown] Server run loop finished.");
+// Start server
+async function main() {
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+  console.error("[Setup] Server connected via stdio.");
 }
 
 main().catch((error) => {
-  console.error("Unhandled error during server execution:", error);
+  console.error("[Setup] Server encountered fatal error:", error);
   process.exit(1);
 });
 ```
 
-### C.2 Example Tool Implementation (`src/tools/accounts.ts` Snippet)
+### C.2 Example Tool Definition (`src/tools/account.ts` Snippet)
 
 ```typescript
-import { mcp, McpTool } from "@mcp/server";
 import { z } from "zod";
-import { EtherscanClient, EtherscanError } from "../utils/client"; // Assuming client and custom error
-import { EtherscanBalanceResponse } from "../utils/types"; // Assuming types definition
 
-// Define the input schema using Zod for validation
+// Define the structure for tool definitions (used across tool files)
+export interface McpToolDefinition {
+  name: string;
+  description: string;
+  inputSchema: z.ZodTypeAny;
+}
+
+// --- Schemas ---
+const EthereumAddressSchema = z
+  .string()
+  .regex(/^0x[a-fA-F0-9]{40}$/, "Invalid Ethereum address format");
+const ChainIdSchema = z
+  .number()
+  .int()
+  .positive("Chain ID must be a positive integer");
+
 const GetBalanceInputSchema = z.object({
-  address: z
-    .string()
-    .regex(/^0x[a-fA-F0-9]{40}$/, "Invalid Ethereum address format"),
-  chainid: z.number().int().positive("Chain ID must be a positive integer"),
+  address: EthereumAddressSchema,
+  chainId: ChainIdSchema,
 });
 
-// Define the tool using mcp.createTool
-// This function might take the client as an argument if not using singletons
-export function getBalanceTool(etherscanClient: EtherscanClient): McpTool {
-  return mcp.createTool({
-    name: "getBalance", // Tool name used in MCP calls (e.g., etherscan.getBalance)
-    description:
-      "Get the ETH balance for a single address on a specific chain.",
-    inputSchema: GetBalanceInputSchema,
-    // outputSchema: z.object({ balance: z.string(), chain: z.number() }), // Optional output validation
+// --- Tool Definition Object ---
+/**
+ * MCP Tool Definition: Get Ether Balance for a single address.
+ */
+export const etherscan_getBalance_Def: McpToolDefinition = {
+  name: "etherscan_getBalance",
+  description:
+    "Get the Ether balance for a single address on a specific chain.",
+  inputSchema: GetBalanceInputSchema,
+};
 
-    // The handler function MUST be async as it performs network I/O
-    async handler(input) {
-      // Input is already validated against GetBalanceInputSchema by the SDK
-      console.error(
-        `[Tool:getBalance] Request for address: ${input.address}, chain: ${input.chainid}`
-      );
-
-      try {
-        // Await the call to the EtherscanClient method
-        const result: EtherscanBalanceResponse =
-          await etherscanClient.getBalance({
-            address: input.address,
-            chainid: input.chainid,
-          });
-
-        // Basic check on the result structure (could be more robust)
-        if (result.status !== "1") {
-          console.error(
-            `[Tool:getBalance] Etherscan API Error: ${result.message} - Result: ${result.result}`
-          );
-          throw new Error(
-            `Etherscan API Error: ${result.message || "Unknown error"}`
-          );
-        }
-
-        console.error(`[Tool:getBalance] Success - Balance: ${result.result}`);
-        // Return data matching outputSchema if defined, or the direct relevant result
-        // MCP framework will wrap this in the appropriate response structure
-        return {
-          type: "etherscan_balance", // Example custom type for clarity
-          balance: result.result,
-          address: input.address,
-          chain: input.chainid,
-        };
-      } catch (error) {
-        console.error("[Tool:getBalance] Error executing tool:", error);
-        // Re-throw errors so the MCP framework can send an error response
-        if (error instanceof EtherscanError) {
-          // Custom error from client
-          throw new Error(`Etherscan Client Error: ${error.message}`);
-        } else if (error instanceof Error) {
-          throw new Error(`Execution Error: ${error.message}`); // Keep original message
-        } else {
-          throw new Error(
-            "An unexpected error occurred while fetching the balance."
-          );
-        }
-      }
-    },
-  });
-}
+// --- Export Array ---
+// Array containing all tool definitions for this module
+export const accountToolDefinitions: McpToolDefinition[] = [
+  etherscan_getBalance_Def,
+  // ... other account tool definitions
+];
 ```
 
 ### C.3 EtherscanClient Snippet (`src/utils/client.ts` Snippet)
 
 ```typescript
 import axios, { AxiosInstance, AxiosError } from "axios";
-import { EtherscanBalanceResponse, EtherscanBaseResponse } from "./types"; // Assuming types definition
+import { EtherscanBalanceResponse, EtherscanBaseResponse } from "./types";
 
-// Optional: Define a custom error class
+// Custom error class
 export class EtherscanError extends Error {
   constructor(message: string) {
     super(message);
@@ -586,103 +609,100 @@ export class EtherscanError extends Error {
 export class EtherscanClient {
   private readonly apiKey: string;
   private readonly axiosInstance: AxiosInstance;
-  private readonly baseUrl: string = "https://api.etherscan.io/v2/api"; // Base URL for v2
+  // Base URL map for different chains
+  private readonly baseUrlMap: { [chainId: number]: string } = {
+    1: "https://api.etherscan.io/api",
+    11155111: "https://api-sepolia.etherscan.io/api",
+    // ... other chains
+  };
 
   constructor(apiKey: string) {
-    if (!apiKey) {
-      throw new Error("Etherscan API key is required.");
-    }
+    // ... constructor logic ...
     this.apiKey = apiKey;
-    this.axiosInstance = axios.create({
-      timeout: 15000, // Example timeout
-    });
-    console.error("[EtherscanClient] Initialized.");
+    this.axiosInstance = axios.create({ timeout: 15000 });
   }
 
-  // Example public method for a specific API action
+  private getBaseUrl(chainId: number): string {
+    const url = this.baseUrlMap[chainId];
+    if (!url) {
+      throw new EtherscanError(`Unsupported chainId: ${chainId}`);
+    }
+    return url;
+  }
+
+  // Example public method
+  /**
+   * Fetches the Ether balance for a single address.
+   * @throws {EtherscanError} If the API returns an error or the request fails.
+   */
   async getBalance(params: {
     address: string;
-    chainid: number;
+    chainId: number;
   }): Promise<EtherscanBalanceResponse> {
-    console.error(
-      `[EtherscanClient:getBalance] Fetching for address ${params.address} on chain ${params.chainid}`
-    );
-    return this._request<EtherscanBalanceResponse>({
+    return this._request<EtherscanBalanceResponse>(params.chainId, {
       module: "account",
       action: "balance",
       address: params.address,
       tag: "latest",
-      chainid: params.chainid,
     });
   }
 
-  // ... other public methods like getTransactions, getContractAbi etc.
+  // ... other public methods ...
 
-  // Simplified private helper method for making requests
+  // Private helper for GET requests
   private async _request<T extends EtherscanBaseResponse>(
-    queryParams: Record<string, string | number>
+    chainId: number,
+    queryParams: Record<string, string | number | boolean>
   ): Promise<T> {
-    // Add the API key to all requests
+    const baseUrl = this.getBaseUrl(chainId);
     const paramsWithKey = { ...queryParams, apikey: this.apiKey };
-
-    const requestUrl = this.baseUrl;
-    console.error(
-      `[EtherscanClient:_request] Making GET request to ${requestUrl} with params:`,
-      Object.keys(paramsWithKey)
-    ); // Log keys, not values (API key)
+    const isProxy = queryParams.module === "proxy";
 
     try {
-      const response = await this.axiosInstance.get<T>(requestUrl, {
+      const response = await this.axiosInstance.get<T>(baseUrl, {
         params: paramsWithKey,
-        headers: {
-          Accept: "application/json",
-        },
       });
 
-      // Basic validation (more checks might be needed)
-      if (response.status !== 200) {
+      // ... validation ...
+
+      const rawData: any = response.data;
+
+      // Handle Etherscan API errors (status='0' or proxy error object)
+      if (!isProxy && rawData.status === "0") {
         throw new EtherscanError(
-          `HTTP Error: ${response.status} ${response.statusText}`
+          `Etherscan API Error: ${rawData.message || "Unknown"}`
         );
       }
-      if (!response.data || typeof response.data !== "object") {
-        throw new EtherscanError("Invalid response format from Etherscan API");
-      }
-
-      // Etherscan specific status check (status '0' means API error)
-      if (response.data.status === "0") {
-        console.warn(
-          `[EtherscanClient:_request] API returned error status: ${response.data.message}, Result: ${response.data.result}`
+      if (isProxy && rawData.error) {
+        throw new EtherscanError(
+          `Etherscan Proxy Error: ${rawData.error.message || "Unknown"}`
         );
-        // Return the error response structure for the handler to process
-        // Or throw a specific error: throw new EtherscanError(response.data.message || 'Etherscan API Error');
-        return response.data; // Let handler decide based on status='0'
+      }
+      if (isProxy && rawData.result === undefined && !rawData.error) {
+        throw new EtherscanError(
+          `Proxy request failed or returned unexpected format`
+        );
       }
 
-      console.error(
-        `[EtherscanClient:_request] Request successful (status ${response.data.status})`
-      );
-      return response.data;
+      // Synthesize response for successful proxy calls if needed
+      if (isProxy && rawData.result !== undefined) {
+        return { status: "1", message: "OK", result: rawData.result } as T;
+      }
+
+      return rawData as T; // For standard successful calls
     } catch (error) {
+      // Axios and other error handling
       if (axios.isAxiosError(error)) {
-        console.error(
-          "[EtherscanClient:_request] Axios Error:",
-          error.message,
-          error.response?.status
-        );
-        throw new EtherscanError(`Network or Request Error: ${error.message}`);
-      } else {
-        console.error(
-          "[EtherscanClient:_request] Unknown Error during request:",
-          error
-        );
-        throw new EtherscanError(
-          `Unexpected Request Error: ${
-            error instanceof Error ? error.message : "Unknown"
-          }`
-        );
+        // ... wrap in EtherscanError ...
+        throw new EtherscanError(`Network/HTTP Error: ${error.message}`);
       }
+      // ... wrap other errors ...
+      throw error instanceof Error
+        ? error
+        : new EtherscanError("Unexpected Request Error");
     }
   }
+
+  // _postRequest helper would be similar but use axios.post
 }
 ```

@@ -88,6 +88,10 @@ export interface McpToolDefinition {
   inputSchema: z.ZodTypeAny; // Changed to accept any Zod schema type
 }
 
+/**
+ * MCP Tool Definition: Get Ether Balance for a single address.
+ * Corresponds to Etherscan API module=account, action=balance.
+ */
 export const etherscan_getBalance_Def: McpToolDefinition = {
   name: "etherscan_getBalance",
   description:
@@ -95,6 +99,10 @@ export const etherscan_getBalance_Def: McpToolDefinition = {
   inputSchema: GetBalanceInputSchema,
 };
 
+/**
+ * MCP Tool Definition: Get a list of 'Normal' Transactions By Address.
+ * Corresponds to Etherscan API module=account, action=txlist.
+ */
 export const etherscan_getNormalTransactions_Def: McpToolDefinition = {
   name: "etherscan_getNormalTransactions",
   description:
@@ -102,7 +110,10 @@ export const etherscan_getNormalTransactions_Def: McpToolDefinition = {
   inputSchema: GetNormalTransactionsInputSchema,
 };
 
-// Definition for Get Multiple Balances
+/**
+ * MCP Tool Definition: Get Ether balance for multiple addresses.
+ * Corresponds to Etherscan API module=account, action=balancemulti.
+ */
 export const etherscan_getMultiBalance_Def: McpToolDefinition = {
   name: "etherscan_getMultiBalance",
   description:
@@ -110,8 +121,10 @@ export const etherscan_getMultiBalance_Def: McpToolDefinition = {
   inputSchema: GetMultiBalanceInputSchema,
 };
 
-// --- New Tool Definitions for Phase 2B ---
-
+/**
+ * MCP Tool Definition: Get a list of internal transactions by address or transaction hash.
+ * Corresponds to Etherscan API module=account, action=txlistinternal.
+ */
 export const etherscan_getInternalTransactions_Def: McpToolDefinition = {
   name: "etherscan_getInternalTransactions",
   description:
@@ -119,6 +132,10 @@ export const etherscan_getInternalTransactions_Def: McpToolDefinition = {
   inputSchema: GetInternalTransactionsInputSchema,
 };
 
+/**
+ * MCP Tool Definition: Get ERC20/ERC721/ERC1155 token transfers for an address or contract.
+ * Corresponds to Etherscan API module=account, action=tokentx (and potentially others).
+ */
 export const etherscan_getTokenTransfers_Def: McpToolDefinition = {
   name: "etherscan_getTokenTransfers",
   description:
@@ -126,6 +143,10 @@ export const etherscan_getTokenTransfers_Def: McpToolDefinition = {
   inputSchema: GetTokenTransfersInputSchema,
 };
 
+/**
+ * MCP Tool Definition: Get a list of blocks validated by a specific address.
+ * Corresponds to Etherscan API module=account, action=getminedblocks.
+ */
 export const etherscan_getMinedBlocks_Def: McpToolDefinition = {
   name: "etherscan_getMinedBlocks",
   description:

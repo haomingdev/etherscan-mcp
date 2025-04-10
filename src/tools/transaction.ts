@@ -18,7 +18,10 @@ const GetTxReceiptStatusInputSchema = z.object({
   chainId: ChainIdSchema,
 });
 
-// Define the tool definition for getTransactionReceiptStatus
+/**
+ * MCP Tool Definition: Get Transaction Receipt Status (Post-Byzantium).
+ * Corresponds to Etherscan API module=transaction, action=gettxreceiptstatus.
+ */
 export const etherscan_getTransactionReceiptStatus_Def: McpToolDefinition = {
   name: "etherscan_getTransactionReceiptStatus",
   description:
@@ -32,7 +35,10 @@ const GetTxExecutionStatusInputSchema = z.object({
   chainId: ChainIdSchema,
 });
 
-// Define the tool definition for getTransactionStatus (Execution Status)
+/**
+ * MCP Tool Definition: Check Transaction Execution Status.
+ * Corresponds to Etherscan API module=transaction, action=getstatus.
+ */
 export const etherscan_getTransactionStatus_Def: McpToolDefinition = {
   name: "etherscan_getTransactionStatus",
   description:

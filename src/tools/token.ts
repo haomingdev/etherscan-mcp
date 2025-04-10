@@ -21,12 +21,20 @@ const GetTokenDataInputSchema = z.object({
 
 // --- Tool Definitions ---
 
+/**
+ * MCP Tool Definition: Get ERC20-Token Total Supply by ContractAddress.
+ * Corresponds to Etherscan API module=stats, action=tokensupply.
+ */
 export const etherscan_getTokenSupply_Def: McpToolDefinition = {
   name: "etherscan_getTokenSupply",
   description: "Get the total supply of an ERC20 token by contract address.",
   inputSchema: GetTokenDataInputSchema,
 };
 
+/**
+ * MCP Tool Definition: Get information about a token by contract address.
+ * Corresponds to Etherscan API module=token, action=tokeninfo.
+ */
 export const etherscan_getTokenInfo_Def: McpToolDefinition = {
   name: "etherscan_getTokenInfo",
   description: "Get information about a token by contract address.",

@@ -4,12 +4,13 @@
     "module": "Node16",
     "moduleResolution": "Node16",
     "outDir": "./dist",
-    "rootDir": "./src",
+    // "rootDir": "./src", // Remove rootDir
+    "rootDirs": ["./src", "./test"], // Use rootDirs instead
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "test/**/*"], // Include test directory
   "exclude": ["node_modules"]
 }

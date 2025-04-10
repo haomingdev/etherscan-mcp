@@ -156,12 +156,12 @@ export class EtherscanClient {
             `[EtherscanClient:_request] Proxy request JSON-RPC error: ${errorMessage}`,
             rawData.error
           );
-          // Synthesize an error EtherscanBaseResponse structure
-          return {
-            status: "0",
-            message: errorMessage,
-            result: rawData.error, // Include the full error object in the result field
-          } as T;
+          // Throw an EtherscanError instead of returning an error structure
+          throw new EtherscanError(
+            `Etherscan Proxy Error: ${errorMessage} (Details: ${JSON.stringify(
+              rawData.error
+            )})`
+          );
         }
         // Handle unexpected proxy response format
         else {
@@ -171,18 +171,25 @@ export class EtherscanClient {
             `[EtherscanClient:_request] Proxy request error: ${errorMessage}`,
             rawData
           );
-          return {
-            status: "0",
-            message: errorMessage,
-            result: rawData || null,
-          } as T;
+          // Throw an EtherscanError
+          throw new EtherscanError(
+            `${errorMessage} (Response: ${JSON.stringify(rawData)})`
+          );
         }
       } else {
-        // Standard Etherscan module response handling (already conforms to EtherscanBaseResponse)
+        // Standard Etherscan module response handling
         if (rawData.status === "0") {
+          const errorMessage = `Etherscan API Error: ${
+            rawData.message || "Unknown error"
+          }`;
+          const errorDetails = rawData.result
+            ? ` (Result: ${JSON.stringify(rawData.result)})`
+            : "";
           console.warn(
-            `[EtherscanClient:_request] Etherscan API returned error status: ${rawData.message}, Result: ${rawData.result}`
+            `[EtherscanClient:_request] ${errorMessage}${errorDetails}`
           );
+          // Throw an EtherscanError containing the API's message and result
+          throw new EtherscanError(`${errorMessage}${errorDetails}`);
         } else {
           console.error(
             `[EtherscanClient:_request] Request successful (status ${rawData.status})`
@@ -193,16 +200,29 @@ export class EtherscanClient {
       }
     } catch (error) {
       if (axios.isAxiosError(error)) {
+        const status = error.response?.status;
+        const data = error.response?.data;
+        const message = error.message;
         console.error(
-          "[EtherscanClient:_request] Axios Network/Request Error:",
-          error.message,
-          error.response?.status,
-          error.response?.data
+          `[EtherscanClient:_request] Axios Network/Request Error: ${message} (Status: ${
+            status || "N/A"
+          }, Data: ${JSON.stringify(data || "N/A")})`
         );
-        throw new EtherscanError(`Network or Request Error: ${error.message}`);
+        // Differentiate between network errors and HTTP status errors
+        if (error.response) {
+          // Error response received from server
+          throw new EtherscanError(
+            `HTTP Error ${status}: ${message} (Response: ${JSON.stringify(
+              data
+            )})`
+          );
+        } else {
+          // Network error (no response received)
+          throw new EtherscanError(`Network Error: ${message}`);
+        }
       } else {
         console.error(
-          "[EtherscanClient:_request] Unknown Error during request:",
+          "[EtherscanClient:_request] Non-Axios Error during request:",
           error
         );
         // Re-throw preserving the original error if possible
@@ -216,8 +236,13 @@ export class EtherscanClient {
   // --- Public API Methods ---
 
   /**
-   * Get Ether Balance for a single address.
-   * Module: account, Action: balance
+   * Fetches the Ether balance for a single address.
+   * @param params - Object containing address and chainId.
+   * @param params.address - The Ethereum address to check the balance for.
+   * @param params.chainId - The chain ID (e.g., 1 for Mainnet, 11155111 for Sepolia).
+   * @returns A Promise resolving to the Etherscan API response for the balance query.
+   * @throws {EtherscanError} If the API returns an error or the request fails.
+   * @link https://docs.etherscan.io/api-endpoints/accounts#get-ether-balance-for-a-single-address
    */
   async getBalance(params: {
     address: string;
@@ -235,9 +260,19 @@ export class EtherscanClient {
   }
 
   /**
-   * Get a list of 'Normal' Transactions By Address.
-   * Module: account, Action: txlist
-   * Supports pagination and sorting.
+   * Fetches a list of 'Normal' Transactions By Address.
+   * Supports pagination, sorting, and block range filtering.
+   * @param params - Object containing query parameters.
+   * @param params.address - The Ethereum address to query transactions for.
+   * @param params.chainId - The chain ID.
+   * @param params.startblock - Optional starting block number.
+   * @param params.endblock - Optional ending block number.
+   * @param params.page - Optional page number for pagination.
+   * @param params.offset - Optional number of transactions per page.
+   * @param params.sort - Optional sort order ('asc' or 'desc').
+   * @returns A Promise resolving to the Etherscan API response containing the list of normal transactions.
+   * @throws {EtherscanError} If the API returns an error or the request fails.
+   * @link https://docs.etherscan.io/api-endpoints/accounts#get-a-list-of-normal-transactions-by-address
    */
   async getNormalTransactions(params: {
     address: string;
@@ -269,10 +304,12 @@ export class EtherscanClient {
   }
 
   /**
-   * Fetches the Ether balance for multiple addresses in a single call.
-   * @param addresses - An array of Ethereum addresses.
+   * Fetches the Ether balance for multiple addresses in a single API call.
+   * @param addresses - An array of Ethereum addresses (up to 20).
    * @param chainId - The chain ID.
-   * @returns A promise that resolves with the full API response object.
+   * @returns A Promise resolving to the Etherscan API response containing balances for the specified addresses.
+   * @throws {EtherscanError} If the API returns an error or the request fails.
+   * @link https://docs.etherscan.io/api-endpoints/accounts#get-ether-balance-for-multiple-addresses-in-a-single-call
    */
   async getMultiBalance(
     addresses: string[],
@@ -294,9 +331,22 @@ export class EtherscanClient {
   }
 
   /**
-   * Get a list of internal transactions by address or transaction hash.
-   * Module: account, Action: txlistinternal
-   * Supports pagination and block range.
+   * Fetches a list of internal transactions by address or transaction hash.
+   * Supports pagination, sorting, and block range filtering.
+   * Either `address` or `txhash` must be provided.
+   * @param params - Object containing query parameters.
+   * @param params.address - Optional Ethereum address to query internal transactions for.
+   * @param params.txhash - Optional transaction hash to query internal transactions for.
+   * @param params.chainId - The chain ID.
+   * @param params.startblock - Optional starting block number.
+   * @param params.endblock - Optional ending block number.
+   * @param params.page - Optional page number for pagination.
+   * @param params.offset - Optional number of transactions per page.
+   * @param params.sort - Optional sort order ('asc' or 'desc').
+   * @returns A Promise resolving to the Etherscan API response containing the list of internal transactions.
+   * @throws {EtherscanError} If neither address nor txhash is provided, or if the API returns an error or the request fails.
+   * @link https://docs.etherscan.io/api-endpoints/accounts#get-a-list-of-internal-transactions-by-address
+   * @link https://docs.etherscan.io/api-endpoints/accounts#get-internal-transactions-by-transaction-hash-txlisthash
    */
   async getInternalTransactions(params: {
     address?: string; // Either address or txhash is required
@@ -342,9 +392,23 @@ export class EtherscanClient {
   }
 
   /**
-   * Get a list of ERC20/ERC721/ERC1155 Token Transfer Events by address.
-   * Module: account, Action: tokentx / tokennfttx / token1155tx
-   * Supports pagination and block range. Specify contractaddress to filter by token.
+   * Fetches a list of ERC20/ERC721/ERC1155 Token Transfer Events by address and/or contract address.
+   * Supports pagination, sorting, and block range filtering. Defaults to ERC20-like behavior (action=tokentx).
+   * Either `address` or `contractaddress` must be provided.
+   * @param params - Object containing query parameters.
+   * @param params.address - Optional address to check transfers for.
+   * @param params.contractaddress - Optional token contract address to filter by.
+   * @param params.chainId - The chain ID.
+   * @param params.startblock - Optional starting block number.
+   * @param params.endblock - Optional ending block number.
+   * @param params.page - Optional page number for pagination.
+   * @param params.offset - Optional number of transactions per page.
+   * @param params.sort - Optional sort order ('asc' or 'desc').
+   * @returns A Promise resolving to the Etherscan API response containing the list of token transfers.
+   * @throws {EtherscanError} If neither address nor contractaddress is provided, or if the API returns an error or the request fails.
+   * @link https://docs.etherscan.io/api-endpoints/accounts#get-a-list-of-erc20-token-transfer-events-by-address
+   * @link https://docs.etherscan.io/api-endpoints/accounts#get-a-list-of-erc721-token-transfer-events-by-address
+   * @link https://docs.etherscan.io/api-endpoints/accounts#get-a-list-of-erc1155-token-transfer-events-by-address
    */
   async getTokenTransfers(params: {
     address?: string; // Address to check transfers for
@@ -393,8 +457,17 @@ export class EtherscanClient {
   }
 
   /**
-   * Get list of blocks validated by address.
-   * Module: account, Action: getminedblocks
+   * Fetches a list of blocks validated by a specific address.
+   * Supports pagination and specifying block type (blocks or uncles).
+   * @param params - Object containing query parameters.
+   * @param params.address - The validator address.
+   * @param params.chainId - The chain ID.
+   * @param params.blocktype - Optional type of blocks ('blocks' or 'uncles', defaults to 'blocks').
+   * @param params.page - Optional page number for pagination.
+   * @param params.offset - Optional number of blocks per page.
+   * @returns A Promise resolving to the Etherscan API response containing the list of mined blocks.
+   * @throws {EtherscanError} If the API returns an error or the request fails.
+   * @link https://docs.etherscan.io/api-endpoints/accounts#get-list-of-blocks-validated-by-address
    */
   async getMinedBlocks(params: {
     address: string;
@@ -426,8 +499,13 @@ export class EtherscanClient {
   // --- Contract Module Methods ---
 
   /**
-   * Get Contract Source Code for Verified Contract Source Codes.
-   * Module: contract, Action: getsourcecode
+   * Fetches the source code for a verified contract.
+   * @param params - Object containing address and chainId.
+   * @param params.address - The contract address.
+   * @param params.chainId - The chain ID.
+   * @returns A Promise resolving to the Etherscan API response containing the source code information.
+   * @throws {EtherscanError} If the API returns an error or the request fails.
+   * @link https://docs.etherscan.io/api-endpoints/contracts#get-contract-source-code-for-verified-contract-source-codes
    */
   async getSourceCode(params: {
     address: string;
@@ -444,8 +522,13 @@ export class EtherscanClient {
   }
 
   /**
-   * Get Contract ABI for Verified Contract Source Codes.
-   * Module: contract, Action: getabi
+   * Fetches the ABI for a verified contract.
+   * @param params - Object containing address and chainId.
+   * @param params.address - The contract address.
+   * @param params.chainId - The chain ID.
+   * @returns A Promise resolving to the Etherscan API response containing the ABI string or an error message.
+   * @throws {EtherscanError} If the API returns an error or the request fails.
+   * @link https://docs.etherscan.io/api-endpoints/contracts#get-contract-abi-for-verified-contract-source-codes
    */
   async getAbi(params: {
     address: string;
@@ -464,8 +547,13 @@ export class EtherscanClient {
   // --- Token Module Methods ---
 
   /**
-   * Get ERC20-Token TotalSupply by ContractAddress.
-   * Module: stats, Action: tokensupply
+   * Fetches the total supply of an ERC20 token.
+   * @param params - Object containing contractaddress and chainId.
+   * @param params.contractaddress - The token contract address.
+   * @param params.chainId - The chain ID.
+   * @returns A Promise resolving to the Etherscan API response containing the total supply string.
+   * @throws {EtherscanError} If the API returns an error or the request fails.
+   * @link https://docs.etherscan.io/api-endpoints/tokens#get-token-total-supply-by-contractaddress
    */
   async getTokenSupply(params: {
     contractaddress: string;
@@ -483,8 +571,13 @@ export class EtherscanClient {
   }
 
   /**
-   * Get Token Info by ContractAddress.
-   * Module: token, Action: tokeninfo
+   * Fetches information about a token by its contract address.
+   * @param params - Object containing contractaddress and chainId.
+   * @param params.contractaddress - The token contract address.
+   * @param params.chainId - The chain ID.
+   * @returns A Promise resolving to the Etherscan API response containing token information.
+   * @throws {EtherscanError} If the API returns an error or the request fails.
+   * @link https://docs.etherscan.io/api-endpoints/tokens#get-token-info-by-contractaddress
    */
   async getTokenInfo(params: {
     contractaddress: string;
@@ -503,9 +596,14 @@ export class EtherscanClient {
   // --- Transaction Module Methods ---
 
   /**
-   * Get Transaction Receipt Status.
-   * Module: transaction, Action: gettxreceiptstatus
-   * Note: Only applicable for post-Byzantium fork transactions. Status '1' = Success, '0' = Failed.
+   * Fetches the status code of a transaction receipt (post-Byzantium).
+   * Status '1' indicates success, '0' indicates failure.
+   * @param params - Object containing txhash and chainId.
+   * @param params.txhash - The transaction hash.
+   * @param params.chainId - The chain ID.
+   * @returns A Promise resolving to the Etherscan API response containing the receipt status.
+   * @throws {EtherscanError} If the API returns an error or the request fails.
+   * @link https://docs.etherscan.io/api-endpoints/transaction#get-transaction-receipt-status
    */
   async getTransactionReceiptStatus(params: {
     txhash: string;
@@ -522,9 +620,14 @@ export class EtherscanClient {
   }
 
   /**
-   * Check Transaction Execution Status.
-   * Module: transaction, Action: getstatus
-   * Note: Status '0' = Pass, '1' = Error. Provides errDescription if error.
+   * Checks the execution status of a transaction.
+   * Status '0' indicates no error, '1' indicates an error occurred.
+   * @param params - Object containing txhash and chainId.
+   * @param params.txhash - The transaction hash.
+   * @param params.chainId - The chain ID.
+   * @returns A Promise resolving to the Etherscan API response containing the execution status.
+   * @throws {EtherscanError} If the API returns an error or the request fails.
+   * @link https://docs.etherscan.io/api-endpoints/transaction#check-contract-execution-status
    */
   async getTransactionStatus(params: {
     txhash: string;
@@ -543,10 +646,28 @@ export class EtherscanClient {
   // --- Logs Module Methods ---
 
   /**
-   * Get event logs matching specified criteria.
-   * Module: logs, Action: getLogs
-   * Supports filtering by block range, address, and topics.
-   * Note: Pagination parameters (page, offset) might have limitations or specific behavior with logs.
+   * Fetches event logs matching specified criteria.
+   * Supports filtering by block range, address, and topics with operators.
+   * @param params - Object containing query parameters for log filtering.
+   * @param params.chainId - The chain ID.
+   * @param params.fromBlock - Optional starting block number or 'latest'.
+   * @param params.toBlock - Optional ending block number or 'latest'.
+   * @param params.address - Optional contract address to filter logs by.
+   * @param params.topic0 - Optional Topic 0 filter.
+   * @param params.topic1 - Optional Topic 1 filter.
+   * @param params.topic2 - Optional Topic 2 filter.
+   * @param params.topic3 - Optional Topic 3 filter.
+   * @param params.topic0_1_opr - Optional operator between topic0 and topic1 ('and'/'or').
+   * @param params.topic1_2_opr - Optional operator between topic1 and topic2 ('and'/'or').
+   * @param params.topic2_3_opr - Optional operator between topic2 and topic3 ('and'/'or').
+   * @param params.topic0_2_opr - Optional operator between topic0 and topic2 ('and'/'or').
+   * @param params.topic0_3_opr - Optional operator between topic0 and topic3 ('and'/'or').
+   * @param params.topic1_3_opr - Optional operator between topic1 and topic3 ('and'/'or').
+   * @param params.page - Optional page number for pagination (check Etherscan docs for behavior).
+   * @param params.offset - Optional number of logs per page (check Etherscan docs for behavior).
+   * @returns A Promise resolving to the Etherscan API response containing the matching event logs.
+   * @throws {EtherscanError} If the API returns an error or the request fails.
+   * @link https://docs.etherscan.io/api-endpoints/logs
    */
   async getLogs(params: {
     chainId: number;
@@ -601,7 +722,16 @@ export class EtherscanClient {
 
   // Add other methods here for other modules (Gas Tracker, Stats)
 
-  // Helper for POST requests (needed for eth_sendRawTransaction)
+  /**
+   * Helper for making POST requests to the Etherscan API.
+   * Handles base URL selection, API key appending, and error handling.
+   * Synthesizes EtherscanBaseResponse structure for proxy requests.
+   * @param chainId - The chain ID to target.
+   * @param payload - The full payload including module, action, and other parameters for the POST body.
+   * @returns A Promise resolving to the parsed API response.
+   * @throws {EtherscanError} If the chainId is unsupported, the request fails, or the API returns an error status.
+   * @private
+   */
   // Return type is Promise<T> which should conform to EtherscanBaseResponse structure,
   // even if synthesized for proxy requests.
   private async _postRequest<T extends EtherscanBaseResponse>(
@@ -689,12 +819,12 @@ export class EtherscanClient {
             `[EtherscanClient:_postRequest] Proxy POST request JSON-RPC error: ${errorMessage}`,
             rawData.error
           );
-          // Synthesize an error EtherscanBaseResponse structure
-          return {
-            status: "0",
-            message: errorMessage,
-            result: rawData.error, // Include the full error object
-          } as T;
+          // Throw an EtherscanError instead of returning an error structure
+          throw new EtherscanError(
+            `Etherscan Proxy POST Error: ${errorMessage} (Details: ${JSON.stringify(
+              rawData.error
+            )})`
+          );
         }
         // Handle unexpected proxy response format
         else {
@@ -704,18 +834,25 @@ export class EtherscanClient {
             `[EtherscanClient:_postRequest] Proxy POST request error: ${errorMessage}`,
             rawData
           );
-          return {
-            status: "0",
-            message: errorMessage,
-            result: rawData || null,
-          } as T;
+          // Throw an EtherscanError
+          throw new EtherscanError(
+            `${errorMessage} (Response: ${JSON.stringify(rawData)})`
+          );
         }
       } else {
         // Standard Etherscan module response handling
         if (rawData.status === "0") {
+          const errorMessage = `Etherscan API POST Error: ${
+            rawData.message || "Unknown error"
+          }`;
+          const errorDetails = rawData.result
+            ? ` (Result: ${JSON.stringify(rawData.result)})`
+            : "";
           console.warn(
-            `[EtherscanClient:_postRequest] Etherscan API returned error status: ${rawData.message}, Result: ${rawData.result}`
+            `[EtherscanClient:_postRequest] ${errorMessage}${errorDetails}`
           );
+          // Throw an EtherscanError containing the API's message and result
+          throw new EtherscanError(`${errorMessage}${errorDetails}`);
         } else {
           console.error(
             `[EtherscanClient:_postRequest] Request successful (status ${rawData.status})`
@@ -726,16 +863,29 @@ export class EtherscanClient {
       }
     } catch (error) {
       if (axios.isAxiosError(error)) {
+        const status = error.response?.status;
+        const data = error.response?.data;
+        const message = error.message;
         console.error(
-          "[EtherscanClient:_postRequest] Axios Network/Request Error:",
-          error.message,
-          error.response?.status,
-          error.response?.data
+          `[EtherscanClient:_postRequest] Axios Network/Request Error: ${message} (Status: ${
+            status || "N/A"
+          }, Data: ${JSON.stringify(data || "N/A")})`
         );
-        throw new EtherscanError(`Network or Request Error: ${error.message}`);
+        // Differentiate between network errors and HTTP status errors
+        if (error.response) {
+          // Error response received from server
+          throw new EtherscanError(
+            `HTTP Error ${status}: ${message} (Response: ${JSON.stringify(
+              data
+            )})`
+          );
+        } else {
+          // Network error (no response received)
+          throw new EtherscanError(`Network Error: ${message}`);
+        }
       } else {
         console.error(
-          "[EtherscanClient:_postRequest] Unknown Error during request:",
+          "[EtherscanClient:_postRequest] Non-Axios Error during request:",
           error
         );
         throw error instanceof Error
@@ -748,8 +898,12 @@ export class EtherscanClient {
   // --- Geth/Proxy Module Methods ---
 
   /**
-   * Returns the number of most recent block.
-   * Module: proxy, Action: eth_blockNumber
+   * Returns the number of the most recent block (eth_blockNumber).
+   * @param params - Object containing chainId.
+   * @param params.chainId - The chain ID.
+   * @returns A Promise resolving to the Etherscan API response containing the block number as a hex string.
+   * @throws {EtherscanError} If the API returns an error or the request fails.
+   * @link https://docs.etherscan.io/api-endpoints/geth-proxy#eth_blocknumber
    */
   async eth_blockNumber(params: {
     chainId: number;
@@ -764,8 +918,14 @@ export class EtherscanClient {
   }
 
   /**
-   * Returns information about a block by block number.
-   * Module: proxy, Action: eth_getBlockByNumber
+   * Returns information about a block by block number (eth_getBlockByNumber).
+   * @param params - Object containing tag, boolean flag, and chainId.
+   * @param params.tag - The block tag ('latest', 'pending', 'earliest', or a hex block number like '0x10d4f').
+   * @param params.boolean - If true, returns full transaction objects; if false, returns only transaction hashes.
+   * @param params.chainId - The chain ID.
+   * @returns A Promise resolving to the Etherscan API response containing the block object or null if not found.
+   * @throws {EtherscanError} If the API returns an error or the request fails.
+   * @link https://docs.etherscan.io/api-endpoints/geth-proxy#eth_getblockbynumber
    */
   async eth_getBlockByNumber(params: {
     tag: string; // Hex block number or 'latest'
@@ -784,8 +944,13 @@ export class EtherscanClient {
   }
 
   /**
-   * Returns the number of transactions in a block from a block matching the given block number.
-   * Module: proxy, Action: eth_getBlockTransactionCountByNumber
+   * Returns the number of transactions in a specific block (eth_getBlockTransactionCountByNumber).
+   * @param params - Object containing tag and chainId.
+   * @param params.tag - The block tag ('latest', 'pending', 'earliest', or a hex block number).
+   * @param params.chainId - The chain ID.
+   * @returns A Promise resolving to the Etherscan API response containing the transaction count as a hex string.
+   * @throws {EtherscanError} If the API returns an error or the request fails.
+   * @link https://docs.etherscan.io/api-endpoints/geth-proxy#eth_getblocktransactioncountbynumber
    */
   async eth_getBlockTransactionCountByNumber(params: {
     tag: string; // Hex block number or 'latest'
@@ -802,8 +967,13 @@ export class EtherscanClient {
   }
 
   /**
-   * Returns the information about a transaction requested by transaction hash.
-   * Module: proxy, Action: eth_getTransactionByHash
+   * Returns information about a transaction by its hash (eth_getTransactionByHash).
+   * @param params - Object containing txhash and chainId.
+   * @param params.txhash - The transaction hash.
+   * @param params.chainId - The chain ID.
+   * @returns A Promise resolving to the Etherscan API response containing the transaction object or null if not found.
+   * @throws {EtherscanError} If the API returns an error or the request fails.
+   * @link https://docs.etherscan.io/api-endpoints/geth-proxy#eth_gettransactionbyhash
    */
   async eth_getTransactionByHash(params: {
     txhash: string;
@@ -823,8 +993,14 @@ export class EtherscanClient {
   }
 
   /**
-   * Returns information about a transaction by block number and transaction index position.
-   * Module: proxy, Action: eth_getTransactionByBlockNumberAndIndex
+   * Returns information about a transaction by block number and index (eth_getTransactionByBlockNumberAndIndex).
+   * @param params - Object containing tag, index, and chainId.
+   * @param params.tag - The block tag ('latest', 'pending', 'earliest', or a hex block number).
+   * @param params.index - The hex index of the transaction within the block (e.g., '0x0').
+   * @param params.chainId - The chain ID.
+   * @returns A Promise resolving to the Etherscan API response containing the transaction object or null if not found.
+   * @throws {EtherscanError} If the API returns an error or the request fails.
+   * @link https://docs.etherscan.io/api-endpoints/geth-proxy#eth_gettransactionbyblocknumberandindex
    */
   async eth_getTransactionByBlockNumberAndIndex(params: {
     tag: string; // Hex block number or 'latest'
@@ -846,8 +1022,14 @@ export class EtherscanClient {
   }
 
   /**
-   * Returns the number of transactions sent from an address.
-   * Module: proxy, Action: eth_getTransactionCount
+   * Returns the number of transactions sent from an address (eth_getTransactionCount).
+   * @param params - Object containing address, tag, and chainId.
+   * @param params.address - The Ethereum address.
+   * @param params.tag - The block tag ('latest', 'pending', 'earliest', or a hex block number).
+   * @param params.chainId - The chain ID.
+   * @returns A Promise resolving to the Etherscan API response containing the transaction count (nonce) as a hex string.
+   * @throws {EtherscanError} If the API returns an error or the request fails.
+   * @link https://docs.etherscan.io/api-endpoints/geth-proxy#eth_gettransactioncount
    */
   async eth_getTransactionCount(params: {
     address: string;
@@ -866,8 +1048,13 @@ export class EtherscanClient {
   }
 
   /**
-   * Submits a pre-signed transaction for broadcast to the Ethereum network.
-   * Module: proxy, Action: eth_sendRawTransaction (POST Request)
+   * Submits a pre-signed transaction for broadcast (eth_sendRawTransaction). Uses POST.
+   * @param params - Object containing hex and chainId.
+   * @param params.hex - The signed transaction data in HEX format (starting with 0x).
+   * @param params.chainId - The chain ID.
+   * @returns A Promise resolving to the Etherscan API response, typically containing the transaction hash on success.
+   * @throws {EtherscanError} If the API returns an error or the request fails.
+   * @link https://docs.etherscan.io/api-endpoints/geth-proxy#eth_sendrawtransaction
    */
   async eth_sendRawTransaction(params: {
     hex: string; // Signed transaction data in HEX format
@@ -887,8 +1074,13 @@ export class EtherscanClient {
   }
 
   /**
-   * Returns the receipt of a transaction by transaction hash.
-   * Module: proxy, Action: eth_getTransactionReceipt
+   * Returns the receipt of a transaction by transaction hash (eth_getTransactionReceipt).
+   * @param params - Object containing txhash and chainId.
+   * @param params.txhash - The transaction hash.
+   * @param params.chainId - The chain ID.
+   * @returns A Promise resolving to the Etherscan API response containing the transaction receipt object or null if not found/pending.
+   * @throws {EtherscanError} If the API returns an error or the request fails.
+   * @link https://docs.etherscan.io/api-endpoints/geth-proxy#eth_gettransactionreceipt
    */
   async eth_getTransactionReceipt(params: {
     txhash: string;
@@ -908,8 +1100,16 @@ export class EtherscanClient {
   }
 
   /**
-   * Executes a new message call immediately without creating a transaction on the block chain.
-   * Module: proxy, Action: eth_call
+   * Executes a message call immediately without creating a transaction (eth_call).
+   * Useful for reading contract data.
+   * @param params - Object containing to, data, tag, and chainId.
+   * @param params.to - The address the transaction is directed to.
+   * @param params.data - The hash of the method signature and encoded parameters.
+   * @param params.tag - The block tag ('latest', 'pending', 'earliest', or a hex block number).
+   * @param params.chainId - The chain ID.
+   * @returns A Promise resolving to the Etherscan API response containing the return value of the executed contract code as a hex string.
+   * @throws {EtherscanError} If the API returns an error or the request fails.
+   * @link https://docs.etherscan.io/api-endpoints/geth-proxy#eth_call
    */
   async eth_call(params: {
     to: string; // Address to execute call against
@@ -930,8 +1130,14 @@ export class EtherscanClient {
   }
 
   /**
-   * Returns code at a given address.
-   * Module: proxy, Action: eth_getCode
+   * Returns the compiled smart contract code at a given address (eth_getCode).
+   * @param params - Object containing address, tag, and chainId.
+   * @param params.address - The Ethereum address.
+   * @param params.tag - The block tag ('latest', 'pending', 'earliest', or a hex block number).
+   * @param params.chainId - The chain ID.
+   * @returns A Promise resolving to the Etherscan API response containing the code as a hex string.
+   * @throws {EtherscanError} If the API returns an error or the request fails.
+   * @link https://docs.etherscan.io/api-endpoints/geth-proxy#eth_getcode
    */
   async eth_getCode(params: {
     address: string;
@@ -950,8 +1156,15 @@ export class EtherscanClient {
   }
 
   /**
-   * Returns the value from a storage position at a given address.
-   * Module: proxy, Action: eth_getStorageAt
+   * Returns the value from a storage position at a given address (eth_getStorageAt).
+   * @param params - Object containing address, position, tag, and chainId.
+   * @param params.address - The Ethereum address.
+   * @param params.position - The hex index of the storage position (e.g., '0x0').
+   * @param params.tag - The block tag ('latest', 'pending', 'earliest', or a hex block number).
+   * @param params.chainId - The chain ID.
+   * @returns A Promise resolving to the Etherscan API response containing the value in storage as a hex string.
+   * @throws {EtherscanError} If the API returns an error or the request fails.
+   * @link https://docs.etherscan.io/api-endpoints/geth-proxy#eth_getstorageat
    */
   async eth_getStorageAt(params: {
     address: string;
@@ -972,8 +1185,12 @@ export class EtherscanClient {
   }
 
   /**
-   * Returns the current price per gas in wei.
-   * Module: proxy, Action: eth_gasPrice
+   * Returns the current price per gas in wei (eth_gasPrice).
+   * @param params - Object containing chainId.
+   * @param params.chainId - The chain ID.
+   * @returns A Promise resolving to the Etherscan API response containing the current gas price as a hex string (in wei).
+   * @throws {EtherscanError} If the API returns an error or the request fails.
+   * @link https://docs.etherscan.io/api-endpoints/geth-proxy#eth_gasprice
    */
   async eth_gasPrice(params: {
     chainId: number;
@@ -988,8 +1205,17 @@ export class EtherscanClient {
   }
 
   /**
-   * Makes a call or transaction, which won't be added to the blockchain and returns the used gas.
-   * Module: proxy, Action: eth_estimateGas
+   * Estimates the gas necessary for a transaction without executing it (eth_estimateGas).
+   * @param params - Object containing transaction parameters and chainId.
+   * @param params.to - The address the transaction is directed to.
+   * @param params.value - The value transferred in wei (hex string).
+   * @param params.gasPrice - Optional legacy gas price in wei (hex string).
+   * @param params.gas - Optional gas limit (hex string).
+   * @param params.data - Optional hash of the method signature and encoded parameters.
+   * @param params.chainId - The chain ID.
+   * @returns A Promise resolving to the Etherscan API response containing the estimated gas amount as a hex string.
+   * @throws {EtherscanError} If the API returns an error or the request fails.
+   * @link https://docs.etherscan.io/api-endpoints/geth-proxy#eth_estimategas
    */
   async eth_estimateGas(params: {
     to: string;

@@ -84,6 +84,10 @@ interface ToolContext {
 // (useful for type safety within the execute function if it were here)
 type GetLogsParams = z.infer<typeof GetLogsInputSchema>;
 
+/**
+ * MCP Tool Definition: Get event logs matching specified criteria.
+ * Corresponds to Etherscan API module=logs, action=getLogs.
+ */
 export const getLogsTool: McpToolDefinition = {
   name: "etherscan_getLogs",
   description:
