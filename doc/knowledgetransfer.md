@@ -1,4 +1,4 @@
-# Etherscan MCP Server: Knowledge Transfer (End of Phase 6)
+# Etherscan MCP Server: Knowledge Transfer (End of Phase 7)
 
 ## Project Goal
 
@@ -6,7 +6,7 @@ Create a comprehensive MCP server wrapping the Etherscan V2 API, exposing endpoi
 
 ## Current Status
 
-- **Phases Completed:** 1 (Setup), 2 (Accounts), 3 (Contracts), 4 (Tokens), 5 (Transactions), 6 (Logs).
+- **Phases Completed:** 1 (Setup), 2 (Accounts), 3 (Contracts), 4 (Tokens), 5 (Transactions), 6 (Logs), 7 (Geth/Proxy).
 - **Implementation Plan:** `doc/implementation.md` tracks the overall progress.
 - **Development Protocol:** Follow the MCP Server Development Protocol defined in `.clinerules`.
 
@@ -27,6 +27,19 @@ The following tools have been implemented and successfully tested:
 - `etherscan_getTransactionReceiptStatus`
 - `etherscan_getTransactionStatus`
 - `etherscan_getLogs`
+- `etherscan_eth_blockNumber`
+- `etherscan_eth_getBlockByNumber`
+- `etherscan_eth_getBlockTransactionCountByNumber`
+- `etherscan_eth_getTransactionByHash`
+- `etherscan_eth_getTransactionByBlockNumberAndIndex`
+- `etherscan_eth_getTransactionCount`
+- `etherscan_eth_getTransactionReceipt`
+- `etherscan_eth_call`
+- `etherscan_eth_getCode`
+- `etherscan_eth_getStorageAt`
+- `etherscan_eth_gasPrice`
+- `etherscan_eth_estimateGas`
+  _Note: `etherscan_eth_sendRawTransaction` was implemented but skipped during testing._
 
 ## Key Files
 
@@ -39,6 +52,7 @@ The following tools have been implemented and successfully tested:
   - `src/tools/token.ts`
   - `src/tools/transaction.ts`
   - `src/tools/log.ts`
+  - `src/tools/proxy.ts`
 - **Documentation:**
   - `doc/implementation.md` (Detailed plan)
   - `doc/technical.md` (Technical specs, API links)
@@ -46,15 +60,14 @@ The following tools have been implemented and successfully tested:
   - `doc/lessons.md` (Debugging notes)
   - `doc/knowledgetransfer.md` (This file)
 
-## Next Steps: Phase 7 (Remaining Modules)
+## Next Steps: Phase 8 (Refinement & Final Testing)
 
-The next phase involves implementing and testing the remaining Etherscan API modules: Geth/Proxy, Gas Tracker, and Stats, as outlined in `doc/implementation.md`. This includes:
+The next phase involves refining the codebase and performing final integration tests across all implemented modules, as outlined in `doc/implementation.md`. This includes:
 
-- Defining necessary types in `src/utils/types.ts`.
-- Implementing corresponding methods in `src/utils/client.ts`.
-- Creating new tool definition files (e.g., `src/tools/proxy.ts`, `src/tools/gas.ts`, `src/tools/stats.ts`).
-- Defining and registering the new tools in `src/index.ts`.
-- Thoroughly testing each new tool.
+- Reviewing error handling and logging.
+- Ensuring type consistency.
+- Adding/updating documentation comments.
+- Performing end-to-end testing with various parameter combinations.
 
 ## _Reminder:_
 
