@@ -381,48 +381,54 @@ function buildPlanningPrompt(
   const availableTools = [
     {
       name: "getBalance",
-      description: "Get ETH balance for a single address.",
+      description:
+        "Get ETH balance for a single address. Accepts 0x address or ENS name.",
       params: "{ address: string, chainId: number }",
     },
     {
       name: "getMultiBalance",
-      description: "Get ETH balance for multiple addresses.",
+      description:
+        "Get ETH balance for multiple addresses. Accepts 0x addresses or ENS names in the list.",
       params: "{ addresses: string[], chainId: number }", // Assuming addresses is an array
     },
     {
       name: "getNormalTransactions",
-      description: "Get normal (external) transactions for an address.",
+      description:
+        "Get normal (external) transactions for an address. Accepts 0x address or ENS name.",
       params:
         "{ address: string, chainId: number, startblock?: number, endblock?: number, page?: number, offset?: number, sort?: 'asc' | 'desc' }",
     },
     {
       name: "getInternalTransactions",
       description:
-        "Get internal transactions for an address or by transaction hash.",
+        "Get internal transactions for an address or by transaction hash. Accepts 0x address or ENS name for the 'address' parameter.",
       params:
         "{ address?: string, txhash?: string, chainId: number, startblock?: number, endblock?: number, page?: number, offset?: number, sort?: 'asc' | 'desc' }", // Added txhash option
     },
     {
       name: "getTokenTransfers",
       description:
-        "Get ERC20/ERC721/ERC1155 token transfers for an address or contract.",
+        "Get ERC20/ERC721/ERC1155 token transfers for an address or contract. Accepts 0x address or ENS name for the 'address' parameter.",
       params:
         "{ address?: string, contractaddress?: string, chainId: number, startblock?: number, endblock?: number, page?: number, offset?: number, sort?: 'asc' | 'desc' }",
     },
     {
       name: "getMinedBlocks",
-      description: "Get blocks validated by an address.",
+      description:
+        "Get blocks validated by an address. Accepts 0x address or ENS name.",
       params:
         "{ address: string, chainId: number, blocktype?: 'blocks' | 'uncles', page?: number, offset?: number }",
     },
     {
       name: "getSourceCode",
-      description: "Get source code and ABI for a verified contract.",
+      description:
+        "Get source code and ABI for a verified contract. Accepts 0x address or ENS name.",
       params: "{ address: string, chainId: number }",
     },
     {
       name: "getAbi",
-      description: "Get ABI for a verified contract.",
+      description:
+        "Get ABI for a verified contract. Accepts 0x address or ENS name.",
       params: "{ address: string, chainId: number }",
     },
     {
@@ -447,7 +453,8 @@ function buildPlanningPrompt(
     },
     {
       name: "getLogs",
-      description: "Get event logs.",
+      description:
+        "Get event logs. Accepts 0x address or ENS name for the 'address' parameter.",
       params:
         "{ address?: string, fromBlock?: number | 'latest', toBlock?: number | 'latest', topic0?: string, topic1?: string, topic2?: string, topic3?: string, topic0_1_opr?: 'and' | 'or', ..., chainId: number, page?: number, offset?: number }", // Added more topic options
     },
@@ -463,7 +470,9 @@ User Query: "${userPrompt}"
 Available Tools:
 ${JSON.stringify(availableTools, null, 2)}
 
-Based ONLY on the user query and the available tools, generate a JSON plan containing a 'steps' array. Each step must specify a 'toolName' from the list above and the necessary 'parameters' derived strictly from the user query. If the query doesn't provide enough information for a required parameter (like 'address' or 'chainId'), you MUST indicate this limitation in the reasoning and produce an empty steps array. Do not make assumptions about missing parameters. If the query involves multiple chains, create separate steps for each chain if necessary.
+IMPORTANT NOTE: For tools that accept an 'address' parameter, you can provide either a standard 0x... address OR an ENS name (like vitalik.eth). The system will automatically resolve ENS names before calling the underlying API.
+
+Based ONLY on the user query and the available tools (including the ENS note above), generate a JSON plan containing a 'steps' array. Each step must specify a 'toolName' from the list above and the necessary 'parameters' derived strictly from the user query. If the query doesn't provide enough information for a required parameter (like 'address' or 'chainId'), you MUST indicate this limitation in the reasoning and produce an empty steps array. Do not make assumptions about missing parameters. If the query involves multiple chains, create separate steps for each chain if necessary.
 
 Output ONLY the JSON plan in the following format:
 ${JSON.stringify(
