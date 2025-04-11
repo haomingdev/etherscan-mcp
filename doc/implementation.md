@@ -170,6 +170,62 @@ This document outlines the phased plan for building the Etherscan MCP server.
 | 9.5  | **Build:** Run `npm run build` one last time to ensure clean compilation.                                                                                  | `[X]`  |
 | 9.6  | **Tag Release (Optional):** Create a Git tag for the version (e.g., `v1.0.0`).                                                                             | `[ ]`  |
 
+## Phase 10: Agent - Dependencies & Setup (New)
+
+- **Goals:** Install necessary SDKs, configure environment variables.
+
+| Step | Task Description                                                                                                                             | Status |
+| :--- | :------------------------------------------------------------------------------------------------------------------------------------------- | :----- |
+| 10.1 | Install Google Generative AI SDK: `npm install @google/generative-ai`.                                                                       | `[ ]`  |
+| 10.2 | Obtain Google API Key from Google AI Studio.                                                                                                 | `[ ]`  |
+| 10.3 | Add `GOOGLE_API_KEY=YOUR_GOOGLE_GEMINI_API_KEY` to `.env` and `.env.example`.                                                                | `[ ]`  |
+| 10.4 | Verify `.env` is in `.gitignore`.                                                                                                            | `[X]`  |
+| 10.5 | Update `src/index.ts` to load `GOOGLE_API_KEY` using `dotenv`. Add error handling if the key is missing.                                     | `[ ]`  |
+| 10.6 | Initialize Google Gemini Model (`gemini-1.5-flash` or similar) in `src/index.ts` using the loaded key. Store the `GenerativeModel` instance. | `[ ]`  |
+| 10.7 | Ensure initialized `EtherscanClient` and `GenerativeModel` instances are accessible where the agent handler will be implemented.             | `[ ]`  |
+
+## Phase 11: Agent - Core Logic Implementation (New)
+
+- **Goals:** Implement the agent script that handles planning, execution, and synthesis using Gemini and the Etherscan client.
+
+| Step | Task Description                                                                                                                                                                                                           | Status |
+| :--- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :----- |
+| 11.1 | Create directory `src/agent/` and file `src/agent/agent.ts`.                                                                                                                                                               | `[ ]`  |
+| 11.2 | Define the main agent function signature in `agent.ts`, e.g., `runAgentTask(prompt: string, etherscanClient: EtherscanClient, geminiModel: GenerativeModel): Promise<string>`.                                             | `[ ]`  |
+| 11.3 | Implement the **Planning Step** within `runAgentTask`: Construct prompt for Gemini listing available `EtherscanClient` methods, call `geminiModel.generateContent`, parse JSON plan response, handle errors. Log the plan. | `[ ]`  |
+| 11.4 | Implement the **Execution Step** within `runAgentTask`: Iterate plan, use `switch` or map to call corresponding `etherscanClient` methods, collect results, handle errors robustly. Log execution steps/errors.            | `[ ]`  |
+| 11.5 | Implement the **Synthesis Step** within `runAgentTask`: Construct prompt for Gemini including original prompt and collected results, call `geminiModel.generateContent`, extract final answer.                             | `[ ]`  |
+| 11.6 | Ensure `runAgentTask` returns the final synthesized string answer.                                                                                                                                                         | `[ ]`  |
+| 11.7 | Add comprehensive logging (`console.error`) within `agent.ts` for planning, execution steps, results, synthesis, and errors.                                                                                               | `[ ]`  |
+
+## Phase 12: Agent - MCP Tool Integration (New)
+
+- **Goals:** Define the new MCP tool and integrate the agent logic into the `tools/call` handler.
+
+| Step | Task Description                                                                                                                                                                                                                                                              | Status |
+| :--- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :----- |
+| 12.1 | Create tool definition file `src/tools/agent.ts`.                                                                                                                                                                                                                             | `[ ]`  |
+| 12.2 | In `src/tools/agent.ts`, define `AgentTaskInputSchema = z.object({ prompt: z.string() })`.                                                                                                                                                                                    | `[ ]`  |
+| 12.3 | In `src/tools/agent.ts`, define `etherscan_runAgentTask_Def: McpToolDefinition` with name, description, and `AgentTaskInputSchema`.                                                                                                                                           | `[ ]`  |
+| 12.4 | In `src/index.ts`, import `etherscan_runAgentTask_Def`.                                                                                                                                                                                                                       | `[ ]`  |
+| 12.5 | In `src/index.ts`, add `etherscan_runAgentTask_Def` to the `allToolDefinitions` array used by the `tools/list` handler.                                                                                                                                                       | `[ ]`  |
+| 12.6 | In `src/index.ts`, import `runAgentTask` from `src/agent/agent.ts`.                                                                                                                                                                                                           | `[ ]`  |
+| 12.7 | In the `tools/call` handler within `src/index.ts`, add a `case 'etherscan_runAgentTask'`: Parse input, get `etherscanClient` and `geminiModel` instances, call `await runAgentTask(...)`, handle errors (throw `McpError`), return `{ result }`. Log steps via `context.log`. | `[ ]`  |
+
+## Phase 13: Agent - Testing & Documentation (New)
+
+- **Goals:** Thoroughly test the agent tool and update all documentation.
+
+| Step | Task Description                                                                                                                                                                                  | Status |
+| :--- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | :----- |
+| 13.1 | Create agent-specific E2E test file, e.g., `test/agent.e2e.ts`.                                                                                                                                   | `[ ]`  |
+| 13.2 | Add tests in `agent.e2e.ts` calling `etherscan_runAgentTask` via `runTool` helper with various prompts (simple, complex, multi-chain, error cases). Ensure test environment has `GOOGLE_API_KEY`. | `[ ]`  |
+| 13.3 | Assert that agent responses are reasonable and synthesized correctly based on expected internal calls.                                                                                            | `[ ]`  |
+| 13.4 | Run `npm run build` and execute the agent E2E tests (`node dist/test/agent.e2e.js`). Debug and fix issues.                                                                                        | `[ ]`  |
+| 13.5 | **Documentation:** Update `README.md`: Add `etherscan_runAgentTask` tool, explain usage, add `GOOGLE_API_KEY` to setup/config.                                                                    | `[ ]`  |
+| 13.6 | **Documentation:** Update `overview-02.md` and `technical.md` (if needed) to reflect the final agent implementation details and dependencies.                                                     | `[ ]`  |
+| 13.7 | Final code review focusing on agent logic, error handling, and security (API key handling).                                                                                                       | `[ ]`  |
+
 ## Risks and Mitigation Strategies
 
 - **Risk:** Etherscan API Rate Limits.
@@ -182,3 +238,15 @@ This document outlines the phased plan for building the Etherscan MCP server.
   - **Mitigation:** Adhere strictly to the MCP Testing Protocol: _test every tool_. Maintain a checklist of tools, parameters tested (valid, invalid, edge-case), and results. Refer to this checklist before marking a phase complete. Use `mcp run tool` extensively.
 - **Risk:** API Key Security and Management.
   - **Mitigation:** Use `.env` for local development. Ensure `.env` is in `.gitignore`. Provide clear instructions in `README.md` for users to manage their key via environment variables (when using `mcp install`) or `settings.json` (when configuring manually). Never commit the key.
+- **Risk:** LLM API Costs & Rate Limits. (New - Phase 10+)
+  - **Mitigation:** Use cost-effective models (e.g., Gemini Flash). Monitor usage via Google Cloud console. Implement retry logic with backoff for LLM API calls. Handle rate limit errors gracefully. Inform users about potential cost implications and external service dependency.
+- **Risk:** LLM Hallucination / Incorrect Planning. (New - Phase 11)
+  - **Mitigation:** Use strong system prompts clearly defining available internal `EtherscanClient` functions and required JSON output format. Validate the LLM's planned function calls against available methods before execution. Handle planning failures gracefully.
+- **Risk:** LLM Response Parsing Errors. (New - Phase 11)
+  - **Mitigation:** Implement robust JSON parsing with `try...catch`. Clean LLM output (e.g., remove markdown formatting) before parsing. Return clear errors if parsing fails.
+- **Risk:** Increased Latency due to Agent. (New - Phase 11)
+  - **Mitigation:** Document the expected higher latency of the agentic tool. Optimize prompts. Parallelize internal Etherscan calls where possible. Use faster LLM models if appropriate.
+- **Risk:** Complexity in Debugging Agent Failures. (New - Phase 11, 13)
+  - **Mitigation:** Implement comprehensive logging (`console.error`, `context.log`) at each agent step (planning, execution, synthesis). Structure agent code modularly. Return informative error messages via MCP.
+- **Risk:** LLM API Key Security (New Credential). (New - Phase 10)
+  - **Mitigation:** Reinforce use of `.env` for local development, ensure `.env` is in `.gitignore`, and provide clear instructions for secure key management in production/deployment scenarios (e.g., environment variables, secrets management).

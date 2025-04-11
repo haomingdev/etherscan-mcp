@@ -14,12 +14,15 @@ This document provides the technical specification for the Etherscan Model Conte
 
 - Implementation of an MCP server using TypeScript and the `@mcp/server` SDK.
 - Wrapping key Etherscan V2 API endpoints (Accounts, Contracts, Transactions, Blocks, Logs, Gas Tracker, Tokens, Stats, Geth/Proxy) as individual MCP tools.
+- **(New)** Implementing an internal agentic capability using Google Gemini to handle complex, multi-step queries via a dedicated `etherscan_runAgentTask` tool.
 - Handling Etherscan API key authentication via environment variables.
+- **(New)** Handling Google API Key authentication via environment variables for the agent.
 - Supporting chain selection (`chainid`) as a common parameter for relevant tools.
 - Error handling using `EtherscanError` and `McpError` for consistent reporting.
 - Comprehensive logging (`console.error`) for requests, responses, and errors within the server.
 - Adherence to the MCP Server Development Protocol, including E2E testing via a dedicated script (`test/e2e.ts`).
 - Configuration instructions for running the server via manual host settings (`settings.json` or similar).
+- **(New)** Defining a new MCP tool (`etherscan_runAgentTask`) to expose this agentic capability.
 
 **Out of Scope:**
 
@@ -28,7 +31,7 @@ This document provides the technical specification for the Etherscan Model Conte
 - Caching Etherscan API responses.
 - Complex rate limiting beyond what Etherscan enforces (initially).
 - Supporting Etherscan API endpoints not listed in the V2 documentation.
-- Advanced blockchain data analysis or transformation within the server.
+- Advanced blockchain data analysis or transformation within the server **(except as orchestrated by the internal agent)**.
 - Direct interaction with blockchain nodes (relies solely on Etherscan API).
 
 ### 1.3 Audience
@@ -52,6 +55,8 @@ This document provides the technical specification for the Etherscan Model Conte
 - [MCP SDK for TypeScript (`@mcp/server`)](https://github.com/modelcontextprotocol/typescript-sdk) (or relevant link if available)
 - Etherscan MCP Server [Overview.md](./overview.md)
 - Etherscan MCP Server [Implementation.md](./implementation.md)
+- **(New)** [Google Generative AI SDK for Node.js](https://github.com/google-gemini/generative-ai-js)
+- **(New)** `src/agent/agent.ts` (Contains agent logic)
 
 ### 1.5 Glossary/Definitions
 
@@ -61,38 +66,36 @@ This document provides the technical specification for the Etherscan Model Conte
 - **Tool:** An MCP capability representing an executable function with defined inputs and outputs.
 - **stdio:** Standard Input/Output. The default communication transport for local MCP servers.
 - **Chain ID:** Numerical identifier for different Ethereum-compatible blockchains (e.g., 1 for Mainnet, 11155111 for Sepolia).
+- **(New) LLM (Large Language Model):** A type of artificial intelligence model capable of understanding and generating human-like text (e.g., Google Gemini).
+- **(New) Agentic Capability:** The server's ability to autonomously plan, execute API calls, and synthesize results based on a high-level prompt.
+- **(New) Planning Step:** The phase where the LLM analyzes the prompt and determines which Etherscan API calls are needed.
+- **(New) Execution Step:** The phase where the server executes the planned API calls using `EtherscanClient`.
+- **(New) Synthesis Step:** The phase where the LLM combines the original prompt and execution results into a final answer.
 
 ## Section 2: System Architecture & Design
 
 ### 2.1 High-Level Overview
 
-The Etherscan MCP Server is a standalone Node.js process designed to run locally alongside an MCP client host. It communicates with the host application via the MCP protocol over a specified transport (defaulting to `stdio`). Its primary function is to receive tool execution requests from the host, translate them into corresponding Etherscan V2 API HTTP requests, process the responses, and return the results (or errors) back to the host according to the MCP specification.
+The server follows a standard MCP architecture using the `@mcp/server` TypeScript SDK. It listens for incoming MCP requests (primarily `tools/list` and `tools/call`) over a specified transport (defaulting to `stdio`).
 
-**Architecture Diagram (Conceptual):**
+**Standard Tool Flow:**
+Client -> MCP Server (`tools/call:etherscan_someTool`) -> Tool Handler Logic (`index.ts`) -> `EtherscanClient` -> Etherscan API -> `EtherscanClient` -> Tool Handler Logic -> MCP Server -> Client
 
-```mermaid
-graph LR
-    User --> Host[MCP Client Host (e.g., Claude Desktop)];
-    Host <-. MCP Protocol (stdio) .-> MCPServer[Etherscan MCP Server (Node.js)];
-    MCPServer -- HTTPS Request --> Etherscan[Etherscan V2 API];
-    MCPServer <-- HTTPS Response -- Etherscan;
-    subgraph MCPServer Internal
-        direction LR
-        SDK[@mcp/server SDK] -- Dispatches --> ToolHandler[Tool Handler (e.g., getBalance)];
-        ToolHandler -- Uses --> Client[EtherscanClient];
-        Client -- Uses --> Axios[axios];
-    end
-    Host -- Displays --> User;
-```
+**(New) Agent Tool Flow:**
+Client -> MCP Server (`tools/call:etherscan_runAgentTask`) -> Tool Handler Logic (`index.ts`) -> Agent Logic (`agent.ts:runAgentTask`) -> Google Gemini (Planning) -> Agent Logic (Plan Parsing) -> `EtherscanClient` (Execution Loop) -> Etherscan API -> `EtherscanClient` -> Agent Logic (Result Aggregation) -> Google Gemini (Synthesis) -> Agent Logic -> Tool Handler Logic -> MCP Server -> Client
 
-### 2.2 Key Components/Modules
+### 2.2 Core Components
 
 - **MCP Server Runtime (`@mcp/server` SDK):** Manages the MCP protocol handshake, message parsing/serialization, tool discovery (`listTools`), tool invocation (`callTool`), input/output validation (via Zod schemas), and transport handling (`stdio`).
-- **Main Server Entry Point (`src/index.ts`):** Initializes the MCP Server instance, loads environment variables (`dotenv`), instantiates the `EtherscanClient`, registers all defined tools with the SDK, and starts the server run loop.
-- **Tool Definitions (`src/tools/*.ts`):** Separate files defining tool metadata (`name`, `description`, `inputSchema` using Zod) as plain objects.
-- **Etherscan API Client (`src/utils/client.ts`):** A custom `EtherscanClient` class encapsulating the logic for interacting with the Etherscan API. It holds the API key, constructs request URLs, uses `axios` to make HTTP requests, performs response validation, and throws `EtherscanError` on failures.
+- **Main Server Entry Point (`src/index.ts`):** Initializes the MCP Server instance, loads environment variables (`dotenv`), instantiates the `EtherscanClient` **and Google Generative AI Model**, registers all defined tools with the SDK, defines the `tools/call` handler logic (routing calls to `EtherscanClient` methods **or the agent function**), and starts the server run loop.
+  **Etherscan API Client (`src/utils/client.ts`):** A custom `EtherscanClient` class encapsulating the logic for interacting with the Etherscan API. It holds the API key, constructs request URLs, uses `axios` to make HTTP requests, performs response validation, and throws `EtherscanError` on failures.
 - **HTTP Request Library (`axios`):** Used by `EtherscanClient` to perform the actual HTTP GET/POST requests to the Etherscan API.
 - **Utilities (`src/utils/*.ts`):** Includes shared TypeScript types/interfaces (`types.ts`) and the custom `EtherscanError` class (defined within `client.ts`).
+- **Tool Definitions (`src/tools/*.ts`):** Individual files defining the metadata (`name`, `description`, `inputSchema` using Zod) for each MCP tool. These definitions are imported and registered in `src/index.ts`.
+- **(New) Agent Logic (`src/agent/agent.ts`):** Contains the `runAgentTask` function responsible for orchestrating the planning (via LLM), execution (via `EtherscanClient`), and synthesis (via LLM) steps for the `etherscan_runAgentTask` tool.
+- **(New) Google Generative AI SDK (`@google/generative-ai`):** Used to interact with the Google Gemini LLM for the planning and synthesis steps within the agent logic.
+- **Type Definitions (`src/utils/types.ts`):** TypeScript interfaces defining the expected structures of Etherscan API responses.
+- **Zod Schemas:** Used for defining `inputSchema` for tools, providing robust runtime validation and type safety.
 
 ### 2.3 Design Choices & Rationale
 
@@ -133,21 +136,37 @@ graph LR
 - **Dependencies:** `axios`, custom Types/Interfaces (`src/utils/types.ts`), potentially custom Errors (`src/utils/errors.ts`).
 - **Interfaces/APIs (Internal):** Called by the MCP tool handlers defined in `src/tools/*.ts`.
 
-### 3.2 Tool Handlers (`src/tools/*.ts`)
+### 3.2 Tool Handlers (`src/tools/*.ts` and logic in `src/index.ts`)
 
 - **Responsibilities:**
-  - Define the MCP tool metadata (`name`, `description`, `inputSchema`).
-  - Receive validated input parameters from the MCP SDK.
-  - Log the incoming request details.
-  - Call the appropriate method(s) on the `EtherscanClient` instance, passing necessary parameters (including `chainid`).
-  - Process the result from `EtherscanClient` if necessary.
-  - Log the successful result or any errors encountered.
-  - Return the result in the format expected by MCP (or throw an error).
-- **Internal Design:** Each handler is an `async` function adhering to the structure required by `mcp.createTool`. Uses `try...catch` blocks for error handling.
-- **Dependencies:** `@mcp/server`, `zod`, `EtherscanClient`, shared Types/Interfaces/Constants.
-- **Interfaces/APIs (Internal):** Called by the `@mcp/server` SDK when a `tools/call` request is received for that specific tool.
+  - Define the MCP tool metadata (`name`, `description`, `inputSchema`) in `src/tools/*.ts` files.
+  - **(Updated)** The central `tools/call` handler in `src/index.ts` receives validated input parameters from the MCP SDK.
+  - **(Updated)** The central handler logs the incoming request details.
+  - **(Updated)** The central handler maps the `toolName` to the corresponding `EtherscanClient` method **or the `runAgentTask` function**.
+  - **(Updated)** The central handler invokes the appropriate function with the validated arguments.
+  - **(Updated)** The central handler receives the result (or error) from the `EtherscanClient` **or `runAgentTask`**.
+  - **(Updated)** The central handler formats the result into the required MCP `ToolResultContent` structure (typically `{ type: 'text', text: '...' }`).
+  - **(Updated)** The central handler logs the final response or error.
+  - **(New)** A new tool definition file `src/tools/agent.ts` will be created for `etherscan_runAgentTask`.
+- **Interfaces/APIs (Internal):** Calls methods on the shared `EtherscanClient` instance **and the `runAgentTask` function.**
 
-## Section 4: API / Interface Specifications (MCP Tool Interface)
+### (New) 3.3 Agent Logic (`src/agent/agent.ts`)
+
+- **Responsibilities:**
+  - Implement the `runAgentTask(prompt: string, etherscanClient: EtherscanClient, geminiModel: GenerativeModel): Promise<string>` function.
+  - **Planning:** Construct a detailed system prompt for the Gemini LLM, providing the user's request and a list of available `EtherscanClient` functions (potentially with descriptions/schemas). Request the LLM to generate a JSON plan outlining the sequence of Etherscan calls needed.
+  - **Plan Parsing:** Parse and validate the JSON plan received from the LLM. Handle potential parsing errors or invalid plan structures.
+  - **Execution:** Iterate through the validated plan. For each step, call the corresponding method on the `etherscanClient` instance with the parameters specified in the plan. Aggregate the results (successful data or error messages) from each step.
+  - **Synthesis:** Construct a second prompt for the Gemini LLM, providing the original user prompt and the aggregated results (including any errors) from the execution step. Request the LLM to generate a final, user-friendly text response summarizing the findings.
+  - **Return Value:** Return the synthesized text response as a string.
+  - **Error Handling:** Implement robust `try...catch` blocks around LLM calls, plan parsing, and Etherscan client calls. Catch and log errors gracefully, potentially including error information in the synthesis step.
+  - **Logging:** Implement comprehensive `console.error` logging for each major step (receiving prompt, planning prompt/response, parsed plan, execution calls/results, synthesis prompt/response, final output, errors).
+- **Interfaces/APIs (Internal):**
+  - Called by the `etherscan_runAgentTask` case within the `tools/call` handler in `src/index.ts`.
+  - Calls `geminiModel.generateContent()` for planning and synthesis.
+  - Calls various methods on the passed `etherscanClient` instance during execution.
+
+## Section 4: API/Protocol Specifications
 
 ### 4.1 External Interfaces Overview
 
@@ -244,21 +263,27 @@ N/A.
 - **Schema Validation:** `zod` (latest)
 - **HTTP Client:** `axios` (latest)
 - **Environment:** `dotenv` (latest)
+- **(New) LLM SDK:** `@google/generative-ai` (latest)
 - **Package Manager:** `npm` or `yarn`
 
 ### 6.2 Code Structure / Project Layout
 
-```
+`````
 etherscan-mcp/
 ├── node_modules/
 ├── src/
 │   ├── index.ts       # Main entry point, server setup, tool registration
-│   ├── tools/         # Tool definitions (e.g., accounts.ts, contracts.ts)
-│   │   └── index.ts   # Optional: Export all tools from this directory
-│   └── utils/         # Utility modules
-│       ├── client.ts    # EtherscanClient class
-│       ├── types.ts     # Shared TypeScript interfaces/types
-│       ├── errors.ts    # Optional: Custom error classes
+│   ├── agent/
+│   │   └── agent.ts   # (New) Core logic for the agentic capability
+│   ├── tools/
+│   │   ├── account.ts   # Tool definitions for 'account' module
+│   │   ├── contract.ts  # Tool definitions for 'contract' module
+│   │   ├── agent.ts     # (New) Tool definition for agent task
+│   │   └── ...        # Other tool definition files
+│   └── utils/
+│       ├── client.ts    # Etherscan API client class
+│       ├── types.ts     # TypeScript types for API responses
+│       └── errors.ts    # Custom error classes (optional)
 │       └── constants.ts # Optional: Shared constants
 ├── dist/            # Compiled JavaScript output (from tsc)
 ├── .env.example     # Example environment variables
@@ -280,24 +305,38 @@ etherscan-mcp/
 ### 6.4 Error Handling Strategy
 
 - Use `try...catch` blocks within tool handlers and `EtherscanClient` methods.
-- `EtherscanClient` validates responses and throws specific (or standard `Error`) errors on API issues (bad status, error messages in response).
-- Tool handlers catch errors from `EtherscanClient`, log them, and re-throw standard `Error` objects with user-friendly messages for the MCP client.
-- The `@mcp/server` SDK handles input validation errors automatically based on Zod schemas.
-- Unhandled exceptions will crash the server process (standard Node.js behavior unless a global handler is added, which is not planned initially).
+- `EtherscanClient` validates responses and throws specific (`EtherscanError`) or standard `Error` errors on API issues (bad status, error messages in response).
+- The central `tools/call` handler catches errors from `EtherscanClient` **or `runAgentTask`** and wraps them in `McpError` using appropriate `ErrorCode` values (`InvalidParams`, `InternalError`, etc.) before returning to the client.
+- **(New)** The `runAgentTask` function includes specific error handling for:
+    - LLM API calls (network errors, authentication, rate limits, invalid responses) via the Google AI SDK.
+    - Parsing the LLM's generated plan (invalid JSON, incorrect structure).
+    - Errors during the execution phase originating from `EtherscanClient`.
+    - Errors during the synthesis LLM call.
+    - These internal agent errors should be logged comprehensively and potentially wrapped before being thrown up to the main handler.
 
-### 6.5 Logging Framework & Strategy
+### 6.5 Logging Strategy
 
-- **Framework:** Standard Node.js `console.error` (directed to stderr, which MCP hosts typically capture).
-- **Levels:** Use prefixes like `[Info]`, `[Warn]`, `[Error]` or rely on `console.info`, `console.warn`, `console.error`.
-- **Format:** Simple text messages including context (e.g., `[Tool:getBalance] Request received for address X`, `[EtherscanClient] API Error: Invalid Address`).
-- **Key Events to Log:**
-  - Server startup and initialization.
-  - Tool call requests (with sanitized parameters if necessary).
-  - Requests made to the Etherscan API (URL, method).
-  - Successful responses from Etherscan API (key details).
-  - Errors from Etherscan API.
-  - Errors caught within handlers or client.
-  - Successful tool execution completion.
+    - **Framework:** Standard Node.js `console.error` (directed to stderr, which MCP hosts typically capture).
+    - **Levels:** Use prefixes like `[Info]`, `[Warn]`, `[Error]` or rely on `console.info`, `console.warn`, `console.error`.
+    - **Format:** Simple text messages including context (e.g., `[Tool:getBalance] Request received for address X`, `[EtherscanClient] API Error: Invalid Address`).
+    - **Key Events to Log:**
+      - Server startup and initialization.
+      - Tool call requests (with sanitized parameters if necessary).
+      - Requests made to the Etherscan API (URL, method).
+      - Successful responses from Etherscan API (key details).
+      - Errors from Etherscan API.
+      - Errors caught within handlers or client.
+      - Successful tool execution completion.
+      - **(New) Agent Step Logging (within `runAgentTask`):**
+      - Received user prompt.
+      - Constructed planning prompt sent to LLM.
+      - Raw plan received from LLM.
+      - Parsed/validated plan.
+      - Each execution step: function called, parameters, success/failure, result/error message.
+      - Aggregated execution results.
+      - Constructed synthesis prompt sent to LLM.
+      - Final synthesized text response from LLM.
+      - Any errors encountered during planning, parsing, execution, or synthesis.
 
 ## Section 7: Security Considerations
 
@@ -320,7 +359,7 @@ etherscan-mcp/
 
 ### 7.4 Credential Management
 
-- The only credential is the `ETHERSCAN_API_KEY`.
+- The primary credentials are the `ETHERSCAN_API_KEY` **and (New) `GOOGLE_API_KEY`**.
 - Store securely using environment variables (loaded via `.env` file locally or configured in the deployment/host environment).
 - Ensure `.env` file is in `.gitignore`.
 
@@ -330,6 +369,17 @@ etherscan-mcp/
 - **Denial of Service (DoS) via Tool Calls:** Mitigation: User approval required by host, potential Etherscan rate limiting.
 - **Malformed Input:** Mitigation: Zod schema validation by SDK.
 - **Etherscan API Issues:** Mitigation: Error handling, logging.
+- **(New) LLM Prompt Injection:** Mitigation: Careful system prompt design, potentially sanitizing user input within the agent, avoid including sensitive data in LLM prompts.
+- **(New) LLM Data Privacy:** Mitigation: Be aware prompts/results are sent to Google; refer to their policies.
+- **(New) LLM Hallucination/Incorrect Actions:** Mitigation: Validate planned calls, use clear prompts, treat agent results as potentially requiring verification.
+- **(New) Agent DoS (via LLM Costs/Time):** Mitigation: Monitor LLM usage, consider input limits.
+
+### (New) 7.6 LLM Interaction Security
+
+- **Prompt Injection:** Maliciously crafted user prompts sent to `etherscan_runAgentTask` could attempt to manipulate the LLM's planning or synthesis steps, potentially causing unexpected behavior, revealing internal details (like function names if included in prompts), or generating harmful content. Mitigation involves designing robust system prompts for the LLM that clearly define its task and boundaries, avoiding the inclusion of sensitive internal details in prompts sent to the LLM, and potentially implementing input filtering on the user prompt within the agent.
+- **Data Privacy:** The user prompt and the aggregated results from Etherscan API calls are sent to the external Google Gemini API during the planning and synthesis steps. Users should be aware of this data flow and consult Google's data usage and privacy policies.
+- **Denial of Service / Cost Overruns:** Complex or malicious prompts could lead to numerous or computationally expensive LLM interactions, incurring unexpected costs or delaying responses. Mitigation includes monitoring LLM API usage and costs, potentially setting usage quotas or budgets via the cloud provider, and possibly implementing basic checks on prompt length or complexity within the agent tool handler.
+- **Incorrect Actions / Hallucination:** The LLM might generate an incorrect plan (calling the wrong Etherscan functions or with wrong parameters) or synthesize an inaccurate final response based on the execution results. Mitigation involves validating the structure and function names within the generated plan before execution, designing clear and unambiguous prompts, and potentially adding a disclaimer to the user that the agent's output is generated by an LLM and may require verification.
 
 ## Section 8: Performance & Scalability
 
@@ -595,114 +645,232 @@ export const accountToolDefinitions: McpToolDefinition[] = [
 ### C.3 EtherscanClient Snippet (`src/utils/client.ts` Snippet)
 
 ```typescript
-import axios, { AxiosInstance, AxiosError } from "axios";
-import { EtherscanBalanceResponse, EtherscanBaseResponse } from "./types";
+{{ ... }}
+}
+```
 
-// Custom error class
-export class EtherscanError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "EtherscanError";
-  }
+### (New) C.4 Agent Logic Snippet (`src/agent/agent.ts` Snippet)
+
+````typescript
+import { EtherscanClient, EtherscanError } from "../utils/client";
+import { GenerativeModel } from "@google/generative-ai";
+import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/server/index.js"; // For throwing MCP-specific errors
+
+// Define interfaces for the expected Plan structure from the LLM
+interface PlanStep {
+  toolName: string; // Should map to an EtherscanClient method name
+  // Parameters should align with the EtherscanClient method's arguments
+  parameters: Record<string, any>;
 }
 
-export class EtherscanClient {
-  private readonly apiKey: string;
-  private readonly axiosInstance: AxiosInstance;
-  // Base URL map for different chains
-  private readonly baseUrlMap: { [chainId: number]: string } = {
-    1: "https://api.etherscan.io/api",
-    11155111: "https://api-sepolia.etherscan.io/api",
-    // ... other chains
-  };
+interface AgentPlan {
+  reasoning?: string; // Optional explanation from LLM
+  steps: PlanStep[];
+}
 
-  constructor(apiKey: string) {
-    // ... constructor logic ...
-    this.apiKey = apiKey;
-    this.axiosInstance = axios.create({ timeout: 15000 });
-  }
+/**
+ * Orchestrates planning, execution, and synthesis for a user prompt.
+ *
+ * @param prompt The natural language query from the user.
+ * @param etherscanClient An initialized EtherscanClient instance.
+ * @param geminiModel An initialized Google Generative AI Model instance.
+ * @returns A promise resolving to the synthesized string answer.
+ * @throws {McpError} If a non-recoverable error occurs (e.g., LLM auth, fatal planning error).
+ */
+export async function runAgentTask(
+  prompt: string,
+  etherscanClient: EtherscanClient,
+  geminiModel: GenerativeModel
+): Promise<string> {
+  console.error(`[Agent] Received prompt: "${prompt}"`);
 
-  private getBaseUrl(chainId: number): string {
-    const url = this.baseUrlMap[chainId];
-    if (!url) {
-      throw new EtherscanError(`Unsupported chainId: ${chainId}`);
-    }
-    return url;
-  }
+  let plan: AgentPlan | null = null;
+  const executionResults: { step: number; result?: any; error?: string }[] = [];
 
-  // Example public method
-  /**
-   * Fetches the Ether balance for a single address.
-   * @throws {EtherscanError} If the API returns an error or the request fails.
-   */
-  async getBalance(params: {
-    address: string;
-    chainId: number;
-  }): Promise<EtherscanBalanceResponse> {
-    return this._request<EtherscanBalanceResponse>(params.chainId, {
-      module: "account",
-      action: "balance",
-      address: params.address,
-      tag: "latest",
-    });
-  }
+  try {
+    // --- 1. Planning Step ---
+    console.error("[Agent] Starting Planning Step...");
+    const planningPrompt = buildPlanningPrompt(prompt, etherscanClient); // Helper to construct the prompt
+    console.error("[Agent] Planning prompt constructed. Calling Gemini...");
 
-  // ... other public methods ...
+    const planningResult = await geminiModel.generateContent(planningPrompt);
+    const planningResponseText = planningResult.response.text();
+    console.error(
+      "[Agent] Received planning response text (raw):",
+      planningResponseText
+    );
 
-  // Private helper for GET requests
-  private async _request<T extends EtherscanBaseResponse>(
-    chainId: number,
-    queryParams: Record<string, string | number | boolean>
-  ): Promise<T> {
-    const baseUrl = this.getBaseUrl(chainId);
-    const paramsWithKey = { ...queryParams, apikey: this.apiKey };
-    const isProxy = queryParams.module === "proxy";
+    plan = parseAndValidatePlan(planningResponseText); // Helper to parse JSON and validate structure
+    console.error(
+      "[Agent] Plan parsed successfully:",
+      JSON.stringify(plan, null, 2)
+    );
 
-    try {
-      const response = await this.axiosInstance.get<T>(baseUrl, {
-        params: paramsWithKey,
+    // --- 2. Execution Step ---
+    console.error("[Agent] Starting Execution Step...");
+    if (!plan || plan.steps.length === 0) {
+      console.error("[Agent] No valid execution steps in the plan.");
+      executionResults.push({
+        step: 0,
+        error: "Agent could not determine actions needed.",
       });
-
-      // ... validation ...
-
-      const rawData: any = response.data;
-
-      // Handle Etherscan API errors (status='0' or proxy error object)
-      if (!isProxy && rawData.status === "0") {
-        throw new EtherscanError(
-          `Etherscan API Error: ${rawData.message || "Unknown"}`
+    } else {
+      for (let i = 0; i < plan.steps.length; i++) {
+        const step = plan.steps[i];
+        console.error(
+          `[Agent] Executing Step ${i + 1}: ${step.toolName} with params:`,
+          step.parameters
         );
-      }
-      if (isProxy && rawData.error) {
-        throw new EtherscanError(
-          `Etherscan Proxy Error: ${rawData.error.message || "Unknown"}`
-        );
-      }
-      if (isProxy && rawData.result === undefined && !rawData.error) {
-        throw new EtherscanError(
-          `Proxy request failed or returned unexpected format`
-        );
-      }
 
-      // Synthesize response for successful proxy calls if needed
-      if (isProxy && rawData.result !== undefined) {
-        return { status: "1", message: "OK", result: rawData.result } as T;
-      }
+        // IMPORTANT: Map step.toolName to actual EtherscanClient methods securely
+        // Avoid using eval(). Use a switch statement or a map.
+        let stepResult: any = null;
+        let stepError: string | null = null;
 
-      return rawData as T; // For standard successful calls
-    } catch (error) {
-      // Axios and other error handling
-      if (axios.isAxiosError(error)) {
-        // ... wrap in EtherscanError ...
-        throw new EtherscanError(`Network/HTTP Error: ${error.message}`);
+        try {
+          // Example using a switch (add all planned EtherscanClient methods)
+          switch (step.toolName) {
+            case "getBalance":
+              // Ensure parameters match EtherscanClient.getBalance input
+              stepResult = await etherscanClient.getBalance(
+                step.parameters as any
+              );
+              break;
+            case "getNormalTransactions":
+              stepResult = await etherscanClient.getNormalTransactions(
+                step.parameters as any
+              );
+              break;
+            // ... add cases for ALL other EtherscanClient methods the LLM might plan ...
+            default:
+              throw new Error(`Unsupported tool planned: ${step.toolName}`);
+          }
+          console.error(
+            `[Agent] Step ${i + 1} (${step.toolName}) executed successfully.`
+          );
+          executionResults.push({ step: i + 1, result: stepResult });
+        } catch (error: any) {
+          console.error(
+            `[Agent] Error executing Step ${i + 1} (${step.toolName}):`,
+            error
+          );
+          stepError =
+            error instanceof Error ? error.message : "Unknown execution error";
+          executionResults.push({ step: i + 1, error: stepError });
+          // Decide if agent should stop on first error, or continue?
+          // For now, let's continue and let synthesis handle errors.
+        }
       }
-      // ... wrap other errors ...
-      throw error instanceof Error
-        ? error
-        : new EtherscanError("Unexpected Request Error");
     }
-  }
+    console.error("[Agent] Execution finished. Results:", executionResults);
 
-  // _postRequest helper would be similar but use axios.post
+    // --- 3. Synthesis Step ---
+    console.error("[Agent] Starting Synthesis Step...");
+    const synthesisPrompt = buildSynthesisPrompt(prompt, executionResults); // Helper to format results for LLM
+    console.error("[Agent] Synthesis prompt constructed. Calling Gemini...");
+
+    const synthesisResult = await geminiModel.generateContent(synthesisPrompt);
+    const finalAnswer = synthesisResult.response.text();
+    console.error("[Agent] Received final synthesized answer:", finalAnswer);
+
+    return finalAnswer;
+  } catch (error: any) {
+    console.error("[Agent] Unrecoverable error during agent task:", error);
+    // Throw an MCPError that the main handler can catch and return to the client
+    throw new McpError(
+      ErrorCode.InternalError, // Or a more specific code if applicable
+      `Agent failed: ${error.message || "Unknown agent error"}`
+    );
+  }
 }
+
+// --- Helper Functions (Implement these) ---
+
+function buildPlanningPrompt(
+  userPrompt: string,
+  client: EtherscanClient
+): string {
+  // TODO: Construct a detailed prompt including:
+  // - Role definition (You are an expert Ethereum assistant...)
+  // - User's query
+  // - List of available tools (EtherscanClient methods) with descriptions/schemas
+  // - Instructions to output a JSON plan in the defined AgentPlan format
+  console.error("[Agent:Helper] Building planning prompt..."); // Placeholder log
+  // Example structure (needs refinement):
+  const availableTools = [
+    {
+      name: "getBalance",
+      description: "Get ETH balance for an address",
+      params: "{ address: string, chainId: number }",
+    },
+    {
+      name: "getNormalTransactions",
+      description: "Get normal txs for an address",
+      params: "{ address: string, chainId: number, startblock?: number, ... }",
+    },
+    // ... List ALL relevant EtherscanClient methods ...
+  ];
+  return `User Query: "${userPrompt}"\n\nAvailable Tools:\n${JSON.stringify(
+    availableTools,
+    null,
+    2
+  )}\n\nGenerate a JSON plan containing a 'steps' array. Each step must use one of the available tools with correct parameters based ONLY on the user query. Output ONLY the JSON plan.
+Plan Format: ${JSON.stringify({
+    reasoning: "(optional brief plan)",
+    steps: [
+      {
+        toolName: "example_tool",
+        parameters: {
+          /* params */
+        },
+      },
+    ],
+  })}
+`;
+}
+
+function parseAndValidatePlan(responseText: string): AgentPlan {
+  // TODO: Implement robust JSON parsing and validation
+  // - Use try...catch for JSON.parse
+  // - Validate the structure against AgentPlan interface (check for 'steps' array, etc.)
+  // - Potentially clean the responseText (remove ```json ... ``` markers if LLM adds them)
+  console.error("[Agent:Helper] Parsing and validating plan..."); // Placeholder log
+  try {
+    // Basic parsing - needs more robust validation
+    const potentialPlan = JSON.parse(
+      responseText.trim().replace(/```json|```/g, "")
+    );
+    if (!potentialPlan || !Array.isArray(potentialPlan.steps)) {
+      throw new Error(
+        "Invalid plan structure: 'steps' array missing or invalid."
+      );
+    }
+    // Add more checks: step objects have toolName, parameters, etc.
+    return potentialPlan as AgentPlan;
+  } catch (e: any) {
+    console.error("[Agent:Helper] Failed to parse or validate plan:", e);
+    throw new Error(`LLM generated invalid plan: ${e.message}`);
+  }
+}
+
+function buildSynthesisPrompt(
+  originalPrompt: string,
+  results: Array<{ step: number; result?: any; error?: string }>
+): string {
+  // TODO: Construct prompt for final answer generation including:
+  // - Role definition
+  // - Original user query
+  // - Formatted results from execution steps (both successes and errors)
+  // - Instruction to provide a concise, helpful answer to the original query.
+  console.error("[Agent:Helper] Building synthesis prompt..."); // Placeholder log
+  return `Original Query: "${originalPrompt}"\n\nExecution Results:\n${JSON.stringify(
+    results,
+    null,
+    2
+  )}\n\nBased on the original query and the execution results, provide a comprehensive and user-friendly answer. If errors occurred, mention them briefly. Answer the query directly.`;
+}
+`````
+
+```
+
 ```
