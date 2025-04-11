@@ -176,13 +176,13 @@ This document outlines the phased plan for building the Etherscan MCP server.
 
 | Step | Task Description                                                                                                                                         | Status |
 | :--- | :------------------------------------------------------------------------------------------------------------------------------------------------------- | :----- |
-| 10.1 | Install Google Generative AI SDK: `npm install @google/generative-ai`.                                                                                   | `[ ]`  |
-| 10.2 | Obtain Google API Key from Google AI Studio.                                                                                                             | `[ ]`  |
-| 10.3 | Add `GOOGLE_API_KEY=YOUR_GOOGLE_GEMINI_API_KEY` to `.env` and `.env.example`.                                                                            | `[ ]`  |
+| 10.1 | Install Google Generative AI SDK: `npm install @google/generative-ai`.                                                                                   | `[X]`  |
+| 10.2 | Obtain Google API Key from Google AI Studio.                                                                                                             | `[X]`  |
+| 10.3 | Add `GOOGLE_API_KEY=YOUR_GOOGLE_GEMINI_API_KEY` to `.env` and `.env.example`.                                                                            | `[X]`  |
 | 10.4 | Verify `.env` is in `.gitignore`.                                                                                                                        | `[X]`  |
-| 10.5 | Update `src/index.ts` to load `GOOGLE_API_KEY` using `dotenv`. Add error handling if the key is missing.                                                 | `[ ]`  |
-| 10.6 | Initialize Google Gemini Model (`gemini-2.5-pro-preview-03-25` or similar) in `src/index.ts` using the loaded key. Store the `GenerativeModel` instance. | `[ ]`  |
-| 10.7 | Ensure initialized `EtherscanClient` and `GenerativeModel` instances are accessible where the agent handler will be implemented.                         | `[ ]`  |
+| 10.5 | Update `src/index.ts` to load `GOOGLE_API_KEY` using `dotenv`. Add error handling if the key is missing.                                                 | `[X]`  |
+| 10.6 | Initialize Google Gemini Model (`gemini-2.5-pro-preview-03-25` or similar) in `src/index.ts` using the loaded key. Store the `GenerativeModel` instance. | `[X]`  |
+| 10.7 | Ensure initialized `EtherscanClient` and `GenerativeModel` instances are accessible where the agent handler will be implemented.                         | `[X]`  |
 
 ## Phase 11: Agent - Core Logic Implementation (New)
 
@@ -190,13 +190,13 @@ This document outlines the phased plan for building the Etherscan MCP server.
 
 | Step | Task Description                                                                                                                                                                                                           | Status |
 | :--- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :----- |
-| 11.1 | Create directory `src/agent/` and file `src/agent/agent.ts`.                                                                                                                                                               | `[ ]`  |
-| 11.2 | Define the main agent function signature in `agent.ts`, e.g., `runAgentTask(prompt: string, etherscanClient: EtherscanClient, geminiModel: GenerativeModel): Promise<string>`.                                             | `[ ]`  |
-| 11.3 | Implement the **Planning Step** within `runAgentTask`: Construct prompt for Gemini listing available `EtherscanClient` methods, call `geminiModel.generateContent`, parse JSON plan response, handle errors. Log the plan. | `[ ]`  |
-| 11.4 | Implement the **Execution Step** within `runAgentTask`: Iterate plan, use `switch` or map to call corresponding `etherscanClient` methods, collect results, handle errors robustly. Log execution steps/errors.            | `[ ]`  |
-| 11.5 | Implement the **Synthesis Step** within `runAgentTask`: Construct prompt for Gemini including original prompt and collected results, call `geminiModel.generateContent`, extract final answer.                             | `[ ]`  |
-| 11.6 | Ensure `runAgentTask` returns the final synthesized string answer.                                                                                                                                                         | `[ ]`  |
-| 11.7 | Add comprehensive logging (`console.error`) within `agent.ts` for planning, execution steps, results, synthesis, and errors.                                                                                               | `[ ]`  |
+| 11.1 | Create directory `src/agent/` and file `src/agent/agent.ts`.                                                                                                                                                               | `[X]`  |
+| 11.2 | Define the main agent function signature in `agent.ts`, e.g., `runAgentTask(prompt: string, etherscanClient: EtherscanClient, geminiModel: GenerativeModel): Promise<string>`.                                             | `[X]`  |
+| 11.3 | Implement the **Planning Step** within `runAgentTask`: Construct prompt for Gemini listing available `EtherscanClient` methods, call `geminiModel.generateContent`, parse JSON plan response, handle errors. Log the plan. | `[X]`  |
+| 11.4 | Implement the **Execution Step** within `runAgentTask`: Iterate plan, use `switch` or map to call corresponding `etherscanClient` methods, collect results, handle errors robustly. Log execution steps/errors.            | `[X]`  |
+| 11.5 | Implement the **Synthesis Step** within `runAgentTask`: Construct prompt for Gemini including original prompt and collected results, call `geminiModel.generateContent`, extract final answer.                             | `[X]`  |
+| 11.6 | Ensure `runAgentTask` returns the final synthesized string answer.                                                                                                                                                         | `[X]`  |
+| 11.7 | Add comprehensive logging (`console.error`) within `agent.ts` for planning, execution steps, results, synthesis, and errors.                                                                                               | `[X]`  |
 
 ## Phase 12: Agent - MCP Tool Integration (New)
 
@@ -204,13 +204,13 @@ This document outlines the phased plan for building the Etherscan MCP server.
 
 | Step | Task Description                                                                                                                                                                                                                                                              | Status |
 | :--- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :----- |
-| 12.1 | Create tool definition file `src/tools/agent.ts`.                                                                                                                                                                                                                             | `[ ]`  |
-| 12.2 | In `src/tools/agent.ts`, define `AgentTaskInputSchema = z.object({ prompt: z.string() })`.                                                                                                                                                                                    | `[ ]`  |
-| 12.3 | In `src/tools/agent.ts`, define `etherscan_runAgentTask_Def: McpToolDefinition` with name, description, and `AgentTaskInputSchema`.                                                                                                                                           | `[ ]`  |
-| 12.4 | In `src/index.ts`, import `etherscan_runAgentTask_Def`.                                                                                                                                                                                                                       | `[ ]`  |
-| 12.5 | In `src/index.ts`, add `etherscan_runAgentTask_Def` to the `allToolDefinitions` array used by the `tools/list` handler.                                                                                                                                                       | `[ ]`  |
-| 12.6 | In `src/index.ts`, import `runAgentTask` from `src/agent/agent.ts`.                                                                                                                                                                                                           | `[ ]`  |
-| 12.7 | In the `tools/call` handler within `src/index.ts`, add a `case 'etherscan_runAgentTask'`: Parse input, get `etherscanClient` and `geminiModel` instances, call `await runAgentTask(...)`, handle errors (throw `McpError`), return `{ result }`. Log steps via `context.log`. | `[ ]`  |
+| 12.1 | Create tool definition file `src/tools/agent.ts`.                                                                                                                                                                                                                             | `[X]`  |
+| 12.2 | In `src/tools/agent.ts`, define `AgentTaskInputSchema = z.object({ prompt: z.string() })`.                                                                                                                                                                                    | `[X]`  |
+| 12.3 | In `src/tools/agent.ts`, define `etherscan_runAgentTask_Def: McpToolDefinition` with name, description, and `AgentTaskInputSchema`.                                                                                                                                           | `[X]`  |
+| 12.4 | In `src/index.ts`, import `etherscan_runAgentTask_Def`.                                                                                                                                                                                                                       | `[X]`  |
+| 12.5 | In `src/index.ts`, add `etherscan_runAgentTask_Def` to the `allToolDefinitions` array used by the `tools/list` handler.                                                                                                                                                       | `[X]`  |
+| 12.6 | In `src/index.ts`, import `runAgentTask` from `src/agent/agent.ts`.                                                                                                                                                                                                           | `[X]`  |
+| 12.7 | In the `tools/call` handler within `src/index.ts`, add a `case 'etherscan_runAgentTask'`: Parse input, get `etherscanClient` and `geminiModel` instances, call `await runAgentTask(...)`, handle errors (throw `McpError`), return `{ result }`. Log steps via `context.log`. | `[X]`  |
 
 ## Phase 13: Agent - Testing & Documentation (New)
 

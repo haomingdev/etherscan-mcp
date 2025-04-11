@@ -2,15 +2,15 @@
 
 ## Project Goal
 
-Create a comprehensive MCP server wrapping the Etherscan V2 API, exposing endpoints as tools.
+Create a comprehensive MCP server wrapping the Etherscan V2 API, exposing endpoints as tools, and adding an agentic capability for complex queries.
 
 ## Current Status
 
-- **Phases Completed:** 1 (Setup), 2 (Accounts), 3 (Contracts), 4 (Tokens), 5 (Transactions), 6 (Logs), 7 (Geth/Proxy).
+- **Phases Completed:** 1 (Setup), 2 (Accounts), 3 (Contracts), 4 (Tokens), 5 (Transactions), 6 (Logs), 7 (Geth/Proxy), 8 (Refinement), 9 (Docs Prep), 10 (Agent Setup), 11 (Agent Logic), 12 (Agent Integration).
 - **Implementation Plan:** `doc/implementation.md` tracks the overall progress.
 - **Development Protocol:** Follow the MCP Server Development Protocol defined in `.clinerules`.
 
-## Implemented & Tested Tools
+## Implemented Tools (Standard Tools Tested, Agent Tool Partially Tested)
 
 The following tools have been implemented and successfully tested:
 
@@ -39,6 +39,7 @@ The following tools have been implemented and successfully tested:
 - `etherscan_eth_getStorageAt`
 - `etherscan_eth_gasPrice`
 - `etherscan_eth_estimateGas`
+- `etherscan_runAgentTask` (Implemented, basic execution confirmed, needs thorough testing)
   _Note: `etherscan_eth_sendRawTransaction` was implemented but skipped during testing._
 
 ## Key Files
@@ -53,6 +54,8 @@ The following tools have been implemented and successfully tested:
   - `src/tools/transaction.ts`
   - `src/tools/log.ts`
   - `src/tools/proxy.ts`
+  - `src/tools/agent.ts` (New Agent Tool Definition)
+- **Agent Logic:** `src/agent/agent.ts` (New Agent Implementation)
 - **Documentation:**
   - `doc/implementation.md` (Detailed plan)
   - `doc/technical.md` (Technical specs, API links)
@@ -60,14 +63,16 @@ The following tools have been implemented and successfully tested:
   - `doc/lessons.md` (Debugging notes)
   - `doc/knowledgetransfer.md` (This file)
 
-## Next Steps: Phase 8 (Refinement & Final Testing)
+## Next Steps: Phase 13 (Agent Testing & Documentation)
 
-The next phase involves refining the codebase and performing final integration tests across all implemented modules, as outlined in `doc/implementation.md`. This includes:
+The next phase involves thoroughly testing the new `etherscan_runAgentTask` tool and updating documentation, as outlined in `doc/implementation.md`. This includes:
 
-- Reviewing error handling and logging.
-- Ensuring type consistency.
-- Adding/updating documentation comments.
-- Performing end-to-end testing with various parameter combinations.
+- Creating agent-specific E2E tests (`test/agent.e2e.ts`).
+- Testing the agent with various prompts (simple, complex, multi-chain, error cases).
+- Asserting agent responses are reasonable and synthesized correctly.
+- Debugging any issues found during testing.
+- Updating `README.md`, `overview-02.md`, and `technical.md` to reflect the agent implementation.
+- Final code review focusing on agent logic.
 
 ## _Reminder:_
 
