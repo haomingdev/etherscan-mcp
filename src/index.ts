@@ -51,6 +51,9 @@ import {
 import { zodToJsonSchema } from "zod-to-json-schema"; // Import the conversion function
 import { logTools } from "./tools/log.js"; // Added import for log tools
 import { proxyTools } from "./tools/proxy.js"; // Added import for proxy tools
+import { agentToolDefinitions } from "./tools/agent.js"; // Added for Agent tool
+import { runAgentTask } from "./agent/agent.js"; // Added for Agent logic
+import { GoogleGenerativeAI, GenerativeModel } from "@google/generative-ai"; // Added for Agent
 // Removed gasTools import
 // Removed statsTools import
 
@@ -62,6 +65,7 @@ const allToolDefinitions = [
   ...transactionToolDefinitions, // Added transaction tools
   ...logTools, // Added log tools
   ...proxyTools, // Added proxy tools
+  ...agentToolDefinitions, // Added agent tool
   // Removed gasTools from array
   // Removed statsTools from array
 ];
@@ -70,19 +74,42 @@ const allToolDefinitions = [
 dotenv.config();
 
 // --- Configuration ---
-const apiKey = process.env.ETHERSCAN_API_KEY;
-if (!apiKey) {
+const etherscanApiKey = process.env.ETHERSCAN_API_KEY; // Renamed
+if (!etherscanApiKey) {
   console.error("FATAL: ETHERSCAN_API_KEY environment variable not set.");
   process.exit(1);
+}
+const googleApiKey = process.env.GOOGLE_API_KEY; // Added for Agent
+if (!googleApiKey) {
+  // Added for Agent
+  console.error("FATAL: GOOGLE_API_KEY environment variable not set."); // Added for Agent
+  process.exit(1); // Added for Agent
 }
 
 // --- Initialize Etherscan Client ---
 let etherscanClient: EtherscanClient;
 try {
-  etherscanClient = new EtherscanClient(apiKey);
+  etherscanClient = new EtherscanClient(etherscanApiKey); // Use renamed variable
   console.error("[Setup] EtherscanClient initialized successfully."); // Log to stderr
 } catch (error: any) {
   console.error("[Setup] Failed to initialize EtherscanClient:", error.message); // Log to stderr
+  process.exit(1);
+}
+
+// --- Initialize Google Gemini Model --- (New Block)
+let geminiModel: GenerativeModel;
+try {
+  const genAI = new GoogleGenerativeAI(googleApiKey);
+  // Use the model name provided by the user
+  geminiModel = genAI.getGenerativeModel({
+    model: "gemini-2.5-pro-preview-03-25",
+  }); // Updated model name as requested
+  console.error("[Setup] Google Gemini Model initialized successfully."); // Log to stderr
+} catch (error: any) {
+  console.error(
+    "[Setup] Failed to initialize Google Gemini Model:",
+    error.message
+  ); // Log to stderr
   process.exit(1);
 }
 
@@ -233,10 +260,27 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       | EtherscanGetTransactionByBlockNumberAndIndexResponse
       | EtherscanGetTransactionReceiptResponse
       | EtherscanSendRawTransactionResponse
-      | EtherscanEstimateGasResponse;
+      | EtherscanEstimateGasResponse
+      | string; // Added string for agent response
     let resultText: string;
 
+    // --- Execute Tool Logic ---
+    // Use a switch statement to route to the correct client method or agent function
     switch (toolName) {
+      // --- Agent Case ---
+      case "etherscan_runAgentTask":
+        console.error(`[Server:callTool][${toolName}] Invoking agent task...`);
+        // Directly call the agent function, passing necessary clients/models
+        resultText = await runAgentTask(
+          validatedArgs.prompt,
+          etherscanClient,
+          geminiModel
+        );
+        console.error(`[Server:callTool][${toolName}] Agent task completed.`);
+        // Agent returns the final text string directly
+        break;
+
+      // --- Standard Etherscan Tool Cases ---
       case "etherscan_getBalance":
         responseData = await etherscanClient.getBalance(validatedArgs);
         console.error(
