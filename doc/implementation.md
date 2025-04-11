@@ -174,15 +174,15 @@ This document outlines the phased plan for building the Etherscan MCP server.
 
 - **Goals:** Install necessary SDKs, configure environment variables.
 
-| Step | Task Description                                                                                                                             | Status |
-| :--- | :------------------------------------------------------------------------------------------------------------------------------------------- | :----- |
-| 10.1 | Install Google Generative AI SDK: `npm install @google/generative-ai`.                                                                       | `[ ]`  |
-| 10.2 | Obtain Google API Key from Google AI Studio.                                                                                                 | `[ ]`  |
-| 10.3 | Add `GOOGLE_API_KEY=YOUR_GOOGLE_GEMINI_API_KEY` to `.env` and `.env.example`.                                                                | `[ ]`  |
-| 10.4 | Verify `.env` is in `.gitignore`.                                                                                                            | `[X]`  |
-| 10.5 | Update `src/index.ts` to load `GOOGLE_API_KEY` using `dotenv`. Add error handling if the key is missing.                                     | `[ ]`  |
-| 10.6 | Initialize Google Gemini Model (`gemini-1.5-flash` or similar) in `src/index.ts` using the loaded key. Store the `GenerativeModel` instance. | `[ ]`  |
-| 10.7 | Ensure initialized `EtherscanClient` and `GenerativeModel` instances are accessible where the agent handler will be implemented.             | `[ ]`  |
+| Step | Task Description                                                                                                                                         | Status |
+| :--- | :------------------------------------------------------------------------------------------------------------------------------------------------------- | :----- |
+| 10.1 | Install Google Generative AI SDK: `npm install @google/generative-ai`.                                                                                   | `[ ]`  |
+| 10.2 | Obtain Google API Key from Google AI Studio.                                                                                                             | `[ ]`  |
+| 10.3 | Add `GOOGLE_API_KEY=YOUR_GOOGLE_GEMINI_API_KEY` to `.env` and `.env.example`.                                                                            | `[ ]`  |
+| 10.4 | Verify `.env` is in `.gitignore`.                                                                                                                        | `[X]`  |
+| 10.5 | Update `src/index.ts` to load `GOOGLE_API_KEY` using `dotenv`. Add error handling if the key is missing.                                                 | `[ ]`  |
+| 10.6 | Initialize Google Gemini Model (`gemini-2.5-pro-preview-03-25` or similar) in `src/index.ts` using the loaded key. Store the `GenerativeModel` instance. | `[ ]`  |
+| 10.7 | Ensure initialized `EtherscanClient` and `GenerativeModel` instances are accessible where the agent handler will be implemented.                         | `[ ]`  |
 
 ## Phase 11: Agent - Core Logic Implementation (New)
 
