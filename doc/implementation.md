@@ -218,13 +218,13 @@ This document outlines the phased plan for building the Etherscan MCP server.
 
 | Step | Task Description                                                                                                                                                                                  | Status |
 | :--- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | :----- |
-| 13.1 | Create agent-specific E2E test file, e.g., `test/agent.e2e.ts`.                                                                                                                                   | `[ ]`  |
-| 13.2 | Add tests in `agent.e2e.ts` calling `etherscan_runAgentTask` via `runTool` helper with various prompts (simple, complex, multi-chain, error cases). Ensure test environment has `GOOGLE_API_KEY`. | `[ ]`  |
-| 13.3 | Assert that agent responses are reasonable and synthesized correctly based on expected internal calls.                                                                                            | `[ ]`  |
-| 13.4 | Run `npm run build` and execute the agent E2E tests (`node dist/test/agent.e2e.js`). Debug and fix issues.                                                                                        | `[ ]`  |
-| 13.5 | **Documentation:** Update `README.md`: Add `etherscan_runAgentTask` tool, explain usage, add `GOOGLE_API_KEY` to setup/config.                                                                    | `[ ]`  |
-| 13.6 | **Documentation:** Update `overview-02.md` and `technical.md` (if needed) to reflect the final agent implementation details and dependencies.                                                     | `[ ]`  |
-| 13.7 | Final code review focusing on agent logic, error handling, and security (API key handling).                                                                                                       | `[ ]`  |
+| 13.1 | Create agent-specific E2E test file, e.g., `test/agent.e2e.ts`.                                                                                                                                   | `[X]`  |
+| 13.2 | Add tests in `agent.e2e.ts` calling `etherscan_runAgentTask` via `runTool` helper with various prompts (simple, complex, multi-chain, error cases). Ensure test environment has `GOOGLE_API_KEY`. | `[X]`  |
+| 13.3 | Assert that agent responses are reasonable and synthesized correctly based on expected internal calls.                                                                                            | `[X]`  |
+| 13.4 | Run `npm run build` and execute the agent E2E tests (`node dist/test/agent.e2e.js`). Debug and fix issues.                                                                                        | `[X]`  |
+| 13.5 | **Documentation:** Update `README.md`: Add `etherscan_runAgentTask` tool, explain usage, add `GOOGLE_API_KEY` to setup/config.                                                                    | `[X]`  |
+| 13.6 | **Documentation:** Update `overview-02.md` and `technical.md` (if needed) to reflect the final agent implementation details and dependencies.                                                     | `[X]`  |
+| 13.7 | Final code review focusing on agent logic, error handling, and security (API key handling).                                                                                                       | `[X]`  |
 
 ## Risks and Mitigation Strategies
 

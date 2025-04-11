@@ -73,11 +73,11 @@ To introduce an **internal agentic capability** within the server. This will be 
 
 ### 2.3 Technology Stack [New Additions]
 
-- **API Client (LLM):** SDK for the chosen LLM provider (e.g., `openai`, `@anthropic-ai/sdk`).
+- **API Client (LLM):** Google Generative AI SDK (`@google/generative-ai`).
 
 ### 2.4 Authentication [New Requirements]
 
-- **LLM:** Requires an API key for the chosen LLM provider (e.g., `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`). Configured via corresponding environment variables.
+- **LLM:** Requires a Google API key (obtained from Google AI Studio). Configured via the `GOOGLE_API_KEY` environment variable.
 
 ### 2.5 Implementation Plan [New Steps]
 

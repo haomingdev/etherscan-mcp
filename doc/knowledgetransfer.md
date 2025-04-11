@@ -6,13 +6,13 @@ Create a comprehensive MCP server wrapping the Etherscan V2 API, exposing endpoi
 
 ## Current Status
 
-- **Phases Completed:** 1 (Setup), 2 (Accounts), 3 (Contracts), 4 (Tokens), 5 (Transactions), 6 (Logs), 7 (Geth/Proxy), 8 (Refinement), 9 (Docs Prep), 10 (Agent Setup), 11 (Agent Logic), 12 (Agent Integration).
+- **Phases Completed:** 1 (Setup), 2 (Accounts), 3 (Contracts), 4 (Tokens), 5 (Transactions), 6 (Logs), 7 (Geth/Proxy), 8 (Refinement), 9 (Docs Prep), 10 (Agent Setup), 11 (Agent Logic), 12 (Agent Integration), 13 (Agent Testing & Docs - Steps 13.1-13.6).
 - **Implementation Plan:** `doc/implementation.md` tracks the overall progress.
 - **Development Protocol:** Follow the MCP Server Development Protocol defined in `.clinerules`.
 
-## Implemented Tools (Standard Tools Tested, Agent Tool Partially Tested)
+## Implemented Tools (All Tools Tested)
 
-The following tools have been implemented and successfully tested:
+The following tools have been implemented and successfully tested (including the agent tool):
 
 - `etherscan_getBalance`
 - `etherscan_getMultiBalance`
@@ -39,7 +39,7 @@ The following tools have been implemented and successfully tested:
 - `etherscan_eth_getStorageAt`
 - `etherscan_eth_gasPrice`
 - `etherscan_eth_estimateGas`
-- `etherscan_runAgentTask` (Implemented, basic execution confirmed, needs thorough testing)
+- `etherscan_runAgentTask` (Implemented and tested via `test/agent.e2e.ts`)
   _Note: `etherscan_eth_sendRawTransaction` was implemented but skipped during testing._
 
 ## Key Files
@@ -62,17 +62,15 @@ The following tools have been implemented and successfully tested:
   - `doc/overview.md` (Project overview)
   - `doc/lessons.md` (Debugging notes)
   - `doc/knowledgetransfer.md` (This file)
+- **Testing:**
+  - `test/e2e.ts` (Standard tool tests)
+  - `test/agent.e2e.ts` (Agent tool tests)
 
-## Next Steps: Phase 13 (Agent Testing & Documentation)
+## Next Steps: Phase 13 Completion (Final Review)
 
-The next phase involves thoroughly testing the new `etherscan_runAgentTask` tool and updating documentation, as outlined in `doc/implementation.md`. This includes:
+The final step of Phase 13 involves:
 
-- Creating agent-specific E2E tests (`test/agent.e2e.ts`).
-- Testing the agent with various prompts (simple, complex, multi-chain, error cases).
-- Asserting agent responses are reasonable and synthesized correctly.
-- Debugging any issues found during testing.
-- Updating `README.md`, `overview-02.md`, and `technical.md` to reflect the agent implementation.
-- Final code review focusing on agent logic.
+- **Step 13.7:** Final code review focusing on agent logic (`src/agent/agent.ts`), error handling, security (API key handling), and overall integration within `src/index.ts`.
 
 ## _Reminder:_
 

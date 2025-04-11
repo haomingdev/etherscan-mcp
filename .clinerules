@@ -1,6 +1,7 @@
 # Cline Rules
 
-HIGH PRIORITY: Start a new task when the context window is 50% full. 
+HIGH PRIORITY: When input token reaches 160000 tokens, document the current completed and next steps in `doc/knowledgetransfer.md` and start a new task with the context. 
+Interupt and document the current task if it is interuppted and will be resumed in the new task. 
 
 # MCP Server Development Protocol
 

@@ -4,13 +4,13 @@
     "module": "Node16",
     "moduleResolution": "Node16",
     "outDir": "./dist",
-    "rootDir": "./src", // Use rootDir to flatten output
-    // "rootDirs": ["./src", "./test"], // Removed rootDirs
+    // "rootDir": "./src", // Removed rootDir to allow compiling 'test' alongside 'src'
+    // "rootDirs": ["./src", "./test"], // Keep commented or use if specific structure needed
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["src/**/*"], // Only include src for compilation
-  "exclude": ["node_modules", "dist", "test"] // Exclude test from compilation
+  "include": ["src/**/*", "test/**/*"], // Include both src and test directories
+  "exclude": ["node_modules", "dist"] // Remove 'test' from exclude
 }

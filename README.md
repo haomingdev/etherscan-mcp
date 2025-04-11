@@ -52,15 +52,21 @@ This server exposes the following Etherscan API endpoints as MCP tools:
 - `etherscan_eth_gasPrice`: Get the current gas price.
 - `etherscan_eth_estimateGas`: Estimate gas needed for a transaction.
 
+**Agent Module:**
+
+- `etherscan_runAgentTask`: Processes a natural language prompt to perform complex Etherscan queries by planning and executing multiple API calls internally using Google Gemini.
+
 ## Setup
 
-1.  **API Key:** Obtain an API key from [Etherscan](https://etherscan.io/myapikey).
-2.  **Environment Variable:** Set the `ETHERSCAN_API_KEY` environment variable. You can do this by:
-    - Creating a `.env` file in the project root:
-      ```
-      ETHERSCAN_API_KEY=YOUR_ACTUAL_API_KEY
-      ```
-    - Or by setting it directly in your system environment or MCP configuration.
+1.  **API Keys:**
+    - Obtain an API key from [Etherscan](https://etherscan.io/myapikey).
+    - Obtain an API key from [Google AI Studio](https://aistudio.google.com/app/apikey) (for the agent functionality).
+2.  **Environment Variables:** Set the following environment variables. You can do this by creating a `.env` file in the project root:
+    ```dotenv
+    ETHERSCAN_API_KEY=YOUR_ACTUAL_ETHERSCAN_API_KEY
+    GOOGLE_API_KEY=YOUR_ACTUAL_GOOGLE_API_KEY
+    ```
+    Alternatively, set them directly in your system environment or MCP configuration (see below).
 
 ## Development
 
@@ -82,10 +88,16 @@ Run the server in development mode (watches for changes):
 npm run dev
 ```
 
-Run end-to-end tests (requires server to be built):
+Run standard end-to-end tests (requires server to be built):
 
 ```bash
 node dist/test/e2e.js
+```
+
+Run agent end-to-end tests (requires server to be built and API keys set):
+
+```bash
+node dist/test/agent.e2e.js
 ```
 
 ## Installation & Configuration
@@ -102,7 +114,8 @@ To use this server with an MCP host (like the Claude Desktop App or VS Code Exte
           "command": "node",
           "args": ["/full/path/to/etherscan-mcp/dist/index.js"], // <-- IMPORTANT: Use absolute path
           "env": {
-            "ETHERSCAN_API_KEY": "YOUR_ACTUAL_API_KEY" // Or ensure it's set in the environment
+            "ETHERSCAN_API_KEY": "YOUR_ACTUAL_ETHERSCAN_API_KEY", // Or ensure it's set in the environment
+            "GOOGLE_API_KEY": "YOUR_ACTUAL_GOOGLE_API_KEY" // Required for agent tool
           },
           "disabled": false,
           "autoApprove": []
@@ -119,7 +132,8 @@ To use this server with an MCP host (like the Claude Desktop App or VS Code Exte
             "command": "node",
             "args": ["/full/path/to/etherscan-mcp/dist/index.js"], // <-- IMPORTANT: Use absolute path
             "env": {
-              "ETHERSCAN_API_KEY": "YOUR_ACTUAL_API_KEY" // Or ensure it's set in the environment
+              "ETHERSCAN_API_KEY": "YOUR_ACTUAL_ETHERSCAN_API_KEY", // Or ensure it's set in the environment
+              "GOOGLE_API_KEY": "YOUR_ACTUAL_GOOGLE_API_KEY" // Required for agent tool
             },
             "disabled": false,
             "autoApprove": []
@@ -177,6 +191,20 @@ To use this server with an MCP host (like the Claude Desktop App or VS Code Exte
   {
     "address": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
     "chainId": 1
+  }
+  </arguments>
+</use_mcp_tool>
+```
+
+**Use Agent Task:**
+
+```xml
+<use_mcp_tool>
+  <server_name>etherscan-mcp</server_name>
+  <tool_name>etherscan_runAgentTask</tool_name>
+  <arguments>
+  {
+    "prompt": "What is the balance of vitalik.eth and how many transactions has it sent on mainnet?"
   }
   </arguments>
 </use_mcp_tool>

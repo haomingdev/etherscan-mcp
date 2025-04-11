@@ -115,6 +115,7 @@ Client -> MCP Server (`tools/call:etherscan_runAgentTask`) -> Tool Handler Logic
 - **Schema Validation:** `zod`
 - **HTTP Client:** `axios`
 - **Environment Variables:** `dotenv`
+- **(New) LLM SDK:** `@google/generative-ai`
 
 ## Section 3: Component/Module Specifications
 
